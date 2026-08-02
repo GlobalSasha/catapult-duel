@@ -8,6 +8,7 @@ import {
   type ProjectileType,
 } from "../core/projectileCatalog";
 import { STRINGS_RU } from "../i18n/strings.ru";
+import { PROJECTILE_TEXTURE_KEYS } from "../views/projectileVisuals";
 
 export interface AimingValues {
   angleDeg: number;
@@ -36,7 +37,7 @@ interface SliderView {
 interface ProjectileButtonView {
   type: ProjectileType;
   panel: Phaser.GameObjects.Rectangle;
-  marker: Phaser.GameObjects.Graphics;
+  marker: Phaser.GameObjects.Image;
   label: Phaser.GameObjects.Text;
   hitZone: Phaser.GameObjects.Rectangle;
 }
@@ -523,78 +524,13 @@ export class AimingControls extends Phaser.GameObjects.Container {
     projectileType: ProjectileType,
     x: number,
     y: number,
-  ): Phaser.GameObjects.Graphics {
-    const graphics = new Phaser.GameObjects.Graphics(scene, { x, y });
-    const tint = GAME_CONFIG.projectiles[projectileType].tint;
-
-    graphics.lineStyle(2, 0xe7dfcf, 0.72);
-    graphics.fillStyle(tint, 1);
-
-    if (projectileType === "stone") {
-      graphics.beginPath();
-      graphics.moveTo(-14, -7);
-      graphics.lineTo(-5, -15);
-      graphics.lineTo(9, -12);
-      graphics.lineTo(15, -2);
-      graphics.lineTo(10, 12);
-      graphics.lineTo(-5, 15);
-      graphics.lineTo(-15, 6);
-      graphics.closePath();
-      graphics.fillPath();
-      graphics.strokePath();
-      graphics.lineStyle(2, 0x64503c, 0.75);
-      graphics.lineBetween(-7, -5, 6, 7);
-    } else if (projectileType === "fire") {
-      graphics.fillRoundedRect(-11, -11, 22, 25, 4);
-      graphics.strokeRoundedRect(-11, -11, 22, 25, 4);
-      graphics.fillStyle(0xffd166, 1);
-      graphics.fillTriangle(-7, -12, 0, -23, 7, -12);
-      graphics.fillStyle(0x272b2d, 0.9);
-      graphics.fillRect(-5, -4, 10, 4);
-    } else if (projectileType === "ice") {
-      graphics.beginPath();
-      graphics.moveTo(-18, 0);
-      graphics.lineTo(5, -12);
-      graphics.lineTo(17, 0);
-      graphics.lineTo(5, 12);
-      graphics.closePath();
-      graphics.fillPath();
-      graphics.strokePath();
-      graphics.lineStyle(2, 0xffffff, 0.72);
-      graphics.lineBetween(-6, 0, 9, 0);
-    } else if (projectileType === "diamond") {
-      graphics.beginPath();
-      graphics.moveTo(0, -18);
-      graphics.lineTo(15, -4);
-      graphics.lineTo(9, 14);
-      graphics.lineTo(-9, 14);
-      graphics.lineTo(-15, -4);
-      graphics.closePath();
-      graphics.fillPath();
-      graphics.strokePath();
-      graphics.lineStyle(2, 0xffffff, 0.74);
-      graphics.lineBetween(-15, -4, 15, -4);
-      graphics.lineBetween(0, -18, -6, -4);
-      graphics.lineBetween(0, -18, 6, -4);
-    } else {
-      graphics.fillCircle(0, 2, 16);
-      graphics.strokeCircle(0, 2, 16);
-      graphics.lineStyle(3, 0xe7dfcf, 0.78);
-      graphics.lineBetween(7, -12, 13, -21);
-      graphics.lineStyle(2, 0xd39a4b, 1);
-      graphics.lineBetween(13, -21, 18, -16);
-      for (let index = 0; index < 8; index += 1) {
-        const angle = (index / 8) * Math.PI * 2;
-        graphics.lineBetween(
-          Math.cos(angle) * 12,
-          2 + Math.sin(angle) * 12,
-          Math.cos(angle) * 19,
-          2 + Math.sin(angle) * 19,
-        );
-      }
-    }
-
-    return graphics;
+  ): Phaser.GameObjects.Image {
+    return new Phaser.GameObjects.Image(
+      scene,
+      x,
+      y,
+      PROJECTILE_TEXTURE_KEYS[projectileType],
+    ).setDisplaySize(42, 42);
   }
 
   private createSlider(options: {

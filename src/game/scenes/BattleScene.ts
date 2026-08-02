@@ -45,6 +45,7 @@ import {
 import { CatapultView } from "../views/CatapultView";
 import { createCastleAmbientEffects } from "../views/CastleAmbientEffects";
 import { drawProtectionBody } from "../views/drawProtection";
+import { PROJECTILE_TEXTURE_KEYS } from "../views/projectileVisuals";
 
 const COLORS = {
   panel: 0x171a1c,
@@ -1854,70 +1855,26 @@ export class BattleScene extends Phaser.Scene {
     projectileType: ProjectileType,
   ): Phaser.GameObjects.Container {
     const radius = GAME_CONFIG.projectiles[projectileType].radius * 1.5;
-    const graphics = new Phaser.GameObjects.Graphics(this);
-    const outline = 0x111416;
+    const displaySize = Math.max(34, radius * 2.75);
+    const glow = new Phaser.GameObjects.Arc(
+      this,
+      0,
+      0,
+      displaySize * 0.42,
+      0,
+      360,
+      false,
+      GAME_CONFIG.projectiles[projectileType].tint,
+      projectileType === "fire" || projectileType === "bomb" ? 0.24 : 0.1,
+    );
+    const model = new Phaser.GameObjects.Image(
+      this,
+      0,
+      0,
+      PROJECTILE_TEXTURE_KEYS[projectileType],
+    ).setDisplaySize(displaySize, displaySize);
 
-    if (projectileType === "stone") {
-      graphics.fillStyle(0x806a55, 1);
-      graphics.lineStyle(3, outline, 1);
-      graphics.fillCircle(0, 0, radius);
-      graphics.strokeCircle(0, 0, radius);
-      graphics.fillStyle(0xb89a75, 0.55);
-      graphics.fillTriangle(-radius * 0.55, -2, 0, -radius * 0.65, radius * 0.35, 1);
-    } else if (projectileType === "fire") {
-      graphics.fillStyle(0x5a2f24, 1);
-      graphics.lineStyle(3, outline, 1);
-      graphics.fillRoundedRect(-radius, -radius * 0.62, radius * 1.85, radius * 1.24, 4);
-      graphics.strokeRoundedRect(-radius, -radius * 0.62, radius * 1.85, radius * 1.24, 4);
-      graphics.fillStyle(0xe55f35, 0.95);
-      graphics.fillRect(-radius * 0.3, -radius * 0.57, radius * 0.46, radius * 1.14);
-      graphics.fillStyle(0xffbf48, 0.9);
-      graphics.fillTriangle(-radius * 1.45, 0, -radius, -radius * 0.48, -radius, radius * 0.48);
-    } else if (projectileType === "ice") {
-      graphics.fillStyle(0x6eb8c7, 1);
-      graphics.lineStyle(3, outline, 1);
-      graphics.beginPath();
-      graphics.moveTo(radius * 1.2, 0);
-      graphics.lineTo(0, -radius * 0.72);
-      graphics.lineTo(-radius, -radius * 0.42);
-      graphics.lineTo(-radius, radius * 0.42);
-      graphics.lineTo(0, radius * 0.72);
-      graphics.closePath();
-      graphics.fillPath();
-      graphics.strokePath();
-      graphics.lineStyle(2, 0xd8fbff, 0.9);
-      graphics.lineBetween(-radius * 0.55, 0, radius * 0.62, 0);
-    } else if (projectileType === "diamond") {
-      graphics.fillStyle(0x9bd9df, 1);
-      graphics.lineStyle(3, outline, 1);
-      graphics.fillTriangle(radius * 1.45, 0, -radius * 0.4, -radius * 0.58, -radius * 0.4, radius * 0.58);
-      graphics.strokeTriangle(radius * 1.45, 0, -radius * 0.4, -radius * 0.58, -radius * 0.4, radius * 0.58);
-      graphics.fillStyle(0x333a40, 1);
-      graphics.fillRect(-radius, -radius * 0.34, radius * 0.72, radius * 0.68);
-      graphics.lineStyle(2, 0xffffff, 0.85);
-      graphics.lineBetween(-radius * 0.05, -radius * 0.3, radius, 0);
-    } else {
-      graphics.fillStyle(0x34373a, 1);
-      graphics.lineStyle(3, outline, 1);
-      graphics.fillCircle(0, 0, radius);
-      graphics.strokeCircle(0, 0, radius);
-      for (let index = 0; index < 8; index += 1) {
-        const angle = (Math.PI * 2 * index) / 8;
-        graphics.fillStyle(index % 2 === 0 ? 0xb55d32 : 0x555c61, 1);
-        graphics.fillTriangle(
-          Math.cos(angle - 0.16) * radius * 0.78,
-          Math.sin(angle - 0.16) * radius * 0.78,
-          Math.cos(angle) * radius * 1.38,
-          Math.sin(angle) * radius * 1.38,
-          Math.cos(angle + 0.16) * radius * 0.78,
-          Math.sin(angle + 0.16) * radius * 0.78,
-        );
-      }
-      graphics.fillStyle(0xe08a3d, 0.95);
-      graphics.fillCircle(0, 0, radius * 0.3);
-    }
-
-    return this.add.container(x, y, [graphics]).setDepth(50);
+    return this.add.container(x, y, [glow, model]).setDepth(50);
   }
 
   private drawProjectileImpactSignature(
