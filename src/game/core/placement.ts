@@ -11,6 +11,7 @@ const VALID_PROTECTION_TYPES: readonly ProtectionType[] = [
 export interface ProtectionPlacement {
   slotIndex: number;
   type: ProtectionType;
+  x?: number;
 }
 
 export interface PlayerPlacement {
@@ -118,6 +119,16 @@ export function validatePlayerPlacement(
     return result(false, "invalid-protection-slot");
   }
 
+  if (
+    placement.protections.some(
+      ({ x }) =>
+        x !== undefined &&
+        (!Number.isFinite(x) || x < 0 || x > GAME_CONFIG.world.width),
+    )
+  ) {
+    return result(false, "invalid-protection-slot");
+  }
+
   if (hasInvalidProtectionType) {
     return result(false, "invalid-protection-type");
   }
@@ -186,5 +197,15 @@ export function getProtectionSlotCenterX(
   return (
     GAME_CONFIG.placement.protectionSlotCenters[playerId][slotIndex] ??
     GAME_CONFIG.placement.protectionSlotCenters[playerId][2]
+  );
+}
+
+export function getProtectionPlacementCenterX(
+  playerId: PlayerId,
+  placement: ProtectionPlacement,
+): number {
+  return placement.x ?? getProtectionSlotCenterX(
+    playerId,
+    placement.slotIndex,
   );
 }

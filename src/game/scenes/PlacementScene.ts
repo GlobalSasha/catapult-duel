@@ -14,11 +14,17 @@ import { GAME_CONFIG } from "../core/gameConfig";
 import {
   cloneMatchPlacement,
   createDefaultMatchPlacement,
+  getCatapultSlotX,
+  getProtectionPlacementCenterX,
   validatePlayerPlacement,
   type MatchPlacement,
   type PlayerPlacement,
 } from "../core/placement";
-import type { ProtectionType } from "../core/protection";
+import {
+  getProtectionDefinition,
+  type ProtectionState,
+  type ProtectionType,
+} from "../core/protection";
 import { GAME_HEIGHT, GAME_WIDTH } from "../gameDimensions";
 import { STRINGS_RU } from "../i18n/strings.ru";
 import { CatapultView } from "../views/CatapultView";
@@ -32,6 +38,14 @@ interface PlacementSceneData {
 }
 
 type PlacementTool = ProtectionType | "erase";
+
+interface ProtectionDropCandidate {
+  centerX: number;
+  x: number;
+  y: number;
+  valid: boolean;
+  reason: "outside" | "overlap" | "support" | "rules" | null;
+}
 
 const COLORS = {
   navy: 0x0e1113,
@@ -51,6 +65,10 @@ export class PlacementScene extends Phaser.Scene {
   private selectedTool: PlacementTool = "wood";
   private dynamicObjects: Phaser.GameObjects.GameObject[] = [];
   private statusMessage: string = STRINGS_RU.placementRecommended;
+  private statusText?: Phaser.GameObjects.Text;
+  private dragPreview?: Phaser.GameObjects.Graphics;
+  private dragPreviewGlow?: Phaser.GameObjects.Rectangle;
+  private dragCandidate?: ProtectionDropCandidate;
 
   constructor() {
     super("PlacementScene");
@@ -344,67 +362,15 @@ export class PlacementScene extends Phaser.Scene {
     );
     catapult.setDepth(24);
 
-    GAME_CONFIG.placement.protectionSlotCenters[
-      this.currentPlayerId
-    ].forEach((x, slotIndex) => {
-      const groundY = getTerrainHeightAt(arena.terrain, x);
-      const item = placement.protections.find(
-        (candidate) => candidate.slotIndex === slotIndex,
+    placement.protections.forEach((item) => {
+      const protection = battleState.protections.find(
+        (candidate) =>
+          candidate.ownerId === this.currentPlayerId &&
+          candidate.id.includes(`slot-${item.slotIndex}-`),
       );
-      const frame = this.track(
-        this.add
-          .rectangle(x, groundY - 65, 76, 126, COLORS.panel, item ? 0.08 : 0.24)
-          .setStrokeStyle(
-            item ? 3 : 2,
-            item ? COLORS.mint : COLORS.panelStroke,
-            item ? 0.9 : 0.66,
-          )
-          .setDepth(17),
-      );
-      this.track(
-        this.add
-          .circle(x, groundY + 21, 14, COLORS.panel, 0.94)
-          .setStrokeStyle(2, item ? COLORS.mint : accent, 0.82)
-          .setDepth(26),
-      );
-      this.track(
-        this.add
-          .text(x, groundY + 21, `${slotIndex + 1}`, {
-            color: COLORS.text,
-            fontFamily: "Arial, sans-serif",
-            fontSize: "11px",
-            fontStyle: "bold",
-          })
-          .setOrigin(0.5)
-          .setDepth(27),
-      );
-      if (item) {
-        const protection = battleState.protections.find(
-          (candidate) =>
-            candidate.ownerId === this.currentPlayerId &&
-            candidate.id.includes(`slot-${slotIndex}-`),
-        );
-        if (protection) {
-          this.drawProtectionOnField(protection);
-        }
+      if (protection) {
+        this.drawProtectionOnField(protection, item.slotIndex);
       }
-      const hitZone = this.track(
-        this.add
-          .rectangle(x, groundY - 65, 82, 142, accent, 0.001)
-          .setInteractive({ useHandCursor: true })
-          .setDepth(42),
-      );
-      hitZone.on("pointerover", () =>
-        frame.setStrokeStyle(4, COLORS.mint, 1),
-      );
-      hitZone.on("pointerout", () =>
-        frame.setStrokeStyle(
-          item ? 3 : 2,
-          item ? COLORS.mint : COLORS.panelStroke,
-          item ? 0.9 : 0.66,
-        ),
-      );
-      hitZone.on("pointerdown", () => this.applyToolToSlot(slotIndex));
     });
 
     this.trackUi(
@@ -444,36 +410,61 @@ export class PlacementScene extends Phaser.Scene {
       x: number;
       color: number;
     }[] = [
-      { type: "wood", label: STRINGS_RU.placementWood, x: 170, color: 0x5b4130 },
-      { type: "net", label: STRINGS_RU.placementNet, x: 390, color: 0x384247 },
-      { type: "metal", label: STRINGS_RU.placementMetal, x: 610, color: 0x4a4f52 },
-      { type: "erase", label: STRINGS_RU.placementErase, x: 830, color: 0x70463c },
+      { type: "wood", label: STRINGS_RU.placementWood, x: 160, color: 0x5b4130 },
+      { type: "net", label: STRINGS_RU.placementNet, x: 370, color: 0x384247 },
+      { type: "metal", label: STRINGS_RU.placementMetal, x: 580, color: 0x4a4f52 },
+      { type: "erase", label: STRINGS_RU.placementErase, x: 790, color: 0x70463c },
     ];
     tools.forEach((tool) => {
       const selected = this.selectedTool === tool.type;
       const button = this.trackUi(
         this.add
-          .rectangle(tool.x, 775, 198, 56, selected ? tool.color : 0x263247, selected ? 1 : 0.92)
+          .rectangle(tool.x, 775, 188, 64, selected ? tool.color : 0x263247, selected ? 1 : 0.92)
           .setStrokeStyle(selected ? 4 : 2, selected ? COLORS.mint : COLORS.panelStroke, selected ? 1 : 0.58)
           .setInteractive({ useHandCursor: true }),
       );
       this.trackUi(
         this.add
-          .text(tool.x, 775, tool.label, {
+          .text(
+            tool.x,
+            775,
+            tool.type === "erase" ? tool.label : `↥  ${tool.label}`,
+            {
             color: COLORS.text,
             fontFamily: "Arial, sans-serif",
             fontSize: "14px",
             fontStyle: "bold",
-          })
+            },
+          )
           .setOrigin(0.5),
       );
+      if (tool.type === "erase") {
+        button.on("pointerdown", () => {
+          this.selectedTool = "erase";
+          this.statusMessage = STRINGS_RU.placementRecommended;
+          this.drawPlayerSetup();
+        });
+        return;
+      }
+
+      const protectionType = tool.type;
+      this.input.setDraggable(button);
       button.on("pointerdown", () => {
-        this.selectedTool = tool.type;
-        this.drawPlayerSetup();
+        this.selectedTool = protectionType;
+        button.setStrokeStyle(4, COLORS.mint, 1);
+      });
+      button.on("dragstart", (pointer: Phaser.Input.Pointer) => {
+        this.beginProtectionDrag(protectionType, undefined, pointer);
+      });
+      button.on("drag", (pointer: Phaser.Input.Pointer) => {
+        this.updateProtectionDrag(protectionType, undefined, pointer);
+      });
+      button.on("dragend", (pointer: Phaser.Input.Pointer) => {
+        this.finishProtectionDrag(protectionType, undefined, pointer);
       });
     });
 
-    this.trackUi(
+    this.statusText = this.trackUi(
       this.add
         .text(70, 845, this.statusMessage, {
           color: this.statusMessage === STRINGS_RU.placementRecommended ? COLORS.secondary : "#ff9b86",
@@ -487,7 +478,8 @@ export class PlacementScene extends Phaser.Scene {
   }
 
   private drawProtectionOnField(
-    protection: ReturnType<typeof createInitialBattleState>["protections"][number],
+    protection: ProtectionState,
+    slotIndex: number,
   ): void {
     const graphics = this.track(this.add.graphics().setDepth(22));
     drawProtectionBody(graphics, protection);
@@ -505,6 +497,48 @@ export class PlacementScene extends Phaser.Scene {
         .setStrokeStyle(2, glowColor, 0.32)
         .setDepth(21),
     );
+    const hitZone = this.track(
+      this.add
+        .rectangle(
+          protection.x + protection.width / 2,
+          protection.y + protection.height / 2,
+          protection.width + 24,
+          protection.height + 24,
+          glowColor,
+          0.001,
+        )
+        .setInteractive({ useHandCursor: true })
+        .setDepth(44),
+    );
+    this.input.setDraggable(hitZone);
+    hitZone.on("pointerover", () => glow.setAlpha(0.2));
+    hitZone.on("pointerout", () => glow.setAlpha(0.12));
+    hitZone.on("pointerdown", () => {
+      if (this.selectedTool !== "erase") {
+        return;
+      }
+
+      this.removeProtection(slotIndex);
+    });
+    hitZone.on("dragstart", (pointer: Phaser.Input.Pointer) => {
+      if (this.selectedTool === "erase") {
+        return;
+      }
+
+      graphics.setAlpha(0.16);
+      glow.setAlpha(0.04);
+      this.beginProtectionDrag(protection.type, slotIndex, pointer);
+    });
+    hitZone.on("drag", (pointer: Phaser.Input.Pointer) => {
+      if (this.selectedTool !== "erase") {
+        this.updateProtectionDrag(protection.type, slotIndex, pointer);
+      }
+    });
+    hitZone.on("dragend", (pointer: Phaser.Input.Pointer) => {
+      if (this.selectedTool !== "erase") {
+        this.finishProtectionDrag(protection.type, slotIndex, pointer);
+      }
+    });
     this.tweens.add({
       targets: glow,
       alpha: 0.12,
@@ -521,6 +555,10 @@ export class PlacementScene extends Phaser.Scene {
       object.destroy();
     });
     this.dynamicObjects = [];
+    this.statusText = undefined;
+    this.dragPreview = undefined;
+    this.dragPreviewGlow = undefined;
+    this.dragCandidate = undefined;
   }
 
   private track<T extends Phaser.GameObjects.GameObject>(object: T): T {
@@ -553,40 +591,265 @@ export class PlacementScene extends Phaser.Scene {
     button.on("pointerdown", onClick);
   }
 
-  private applyToolToSlot(slotIndex: number): void {
-    const placement = this.draft[this.currentPlayerId];
-    const withoutSlot = placement.protections.filter(
-      (item) => item.slotIndex !== slotIndex,
+  private beginProtectionDrag(
+    type: ProtectionType,
+    slotIndex: number | undefined,
+    pointer: Phaser.Input.Pointer,
+  ): void {
+    this.dragPreview = this.track(this.add.graphics().setDepth(63));
+    this.dragPreviewGlow = this.track(
+      this.add.rectangle(0, 0, 1, 1, COLORS.mint, 0.08).setDepth(62),
     );
+    this.updateProtectionDrag(type, slotIndex, pointer);
+  }
 
-    if (this.selectedTool === "erase") {
-      placement.protections = withoutSlot;
-      this.statusMessage = STRINGS_RU.placementRecommended;
+  private updateProtectionDrag(
+    type: ProtectionType,
+    slotIndex: number | undefined,
+    pointer: Phaser.Input.Pointer,
+  ): void {
+    const candidate = this.getProtectionDropCandidate(
+      type,
+      slotIndex,
+      pointer,
+    );
+    const definition = getProtectionDefinition(type);
+    const color = candidate.valid ? COLORS.mint : COLORS.coral;
+
+    this.dragCandidate = candidate;
+    this.dragPreview?.clear();
+    if (this.dragPreview) {
+      drawProtectionBody(this.dragPreview, {
+        type,
+        x: candidate.x,
+        y: candidate.y,
+        width: definition.width,
+        height: definition.height,
+      });
+      this.dragPreview.setAlpha(candidate.valid ? 0.92 : 0.42);
+    }
+    this.dragPreviewGlow
+      ?.setPosition(
+        candidate.centerX,
+        candidate.y + definition.height / 2,
+      )
+      .setDisplaySize(
+        definition.width + 22,
+        definition.height + 22,
+      )
+      .setFillStyle(color, 0.09)
+      .setStrokeStyle(4, color, 0.92);
+    this.statusText
+      ?.setText(
+        candidate.valid
+          ? STRINGS_RU.placementDropValid
+          : STRINGS_RU.placementDropInvalid,
+      )
+      .setColor(candidate.valid ? "#7ee2a8" : "#ff9b86");
+  }
+
+  private finishProtectionDrag(
+    type: ProtectionType,
+    slotIndex: number | undefined,
+    pointer: Phaser.Input.Pointer,
+  ): void {
+    this.updateProtectionDrag(type, slotIndex, pointer);
+    const candidate = this.dragCandidate;
+
+    if (!candidate?.valid) {
+      this.statusMessage =
+        candidate?.reason === "overlap"
+          ? STRINGS_RU.placementErrorOverlap
+          : candidate?.reason === "support"
+            ? STRINGS_RU.placementErrorSupport
+            : candidate?.reason === "rules"
+              ? this.getPlacementRulesError(type, slotIndex)
+              : STRINGS_RU.placementDropInvalid;
       this.drawPlayerSetup();
       return;
     }
 
-    const candidate: PlayerPlacement = {
+    const placement = this.draft[this.currentPlayerId];
+    if (slotIndex !== undefined) {
+      placement.protections = placement.protections.map((item) =>
+        item.slotIndex === slotIndex
+          ? { ...item, x: candidate.centerX }
+          : item,
+      );
+    } else {
+      const freeSlotIndex = this.getFreeProtectionSlotIndex();
+      if (freeSlotIndex === undefined) {
+        this.statusMessage = STRINGS_RU.placementErrorCount;
+        this.drawPlayerSetup();
+        return;
+      }
+      placement.protections = [
+        ...placement.protections,
+        { slotIndex: freeSlotIndex, type, x: candidate.centerX },
+      ];
+    }
+
+    this.statusMessage = STRINGS_RU.placementRecommended;
+    this.drawPlayerSetup();
+  }
+
+  private getProtectionDropCandidate(
+    type: ProtectionType,
+    slotIndex: number | undefined,
+    pointer: Phaser.Input.Pointer,
+  ): ProtectionDropCandidate {
+    const arena = getArenaDefinition(this.arenaId);
+    const definition = getProtectionDefinition(type);
+    const configuredCenters =
+      GAME_CONFIG.placement.protectionSlotCenters[this.currentPlayerId];
+    const minimumCenter = Math.min(...configuredCenters) - 70;
+    const maximumCenter = Math.max(...configuredCenters) + 70;
+    const centerX = Phaser.Math.Clamp(
+      pointer.worldX,
+      minimumCenter,
+      maximumCenter,
+    );
+    const x = centerX - definition.width / 2;
+    const groundY = getTerrainHeightAt(arena.terrain, centerX);
+    const y = groundY - definition.height;
+    const insideField =
+      pointer.y > 155 &&
+      pointer.y < 690 &&
+      pointer.worldX >= minimumCenter &&
+      pointer.worldX <= maximumCenter;
+    const leftSupportY = getTerrainHeightAt(
+      arena.terrain,
+      centerX - definition.width * 0.42,
+    );
+    const rightSupportY = getTerrainHeightAt(
+      arena.terrain,
+      centerX + definition.width * 0.42,
+    );
+    const stableSupport = Math.abs(leftSupportY - rightSupportY) <= 24;
+    const catapultX = getCatapultSlotX(
+      this.currentPlayerId,
+      this.draft[this.currentPlayerId].catapultSlotIndex,
+    );
+    const overlapsCatapult =
+      Math.abs(centerX - catapultX) < definition.width / 2 + 92;
+    const overlapsProtection = this.draft[
+      this.currentPlayerId
+    ].protections.some((item) => {
+      if (item.slotIndex === slotIndex) {
+        return false;
+      }
+      const otherDefinition = getProtectionDefinition(item.type);
+      const otherCenterX = getProtectionPlacementCenterX(
+        this.currentPlayerId,
+        item,
+      );
+      const otherGroundY = getTerrainHeightAt(
+        arena.terrain,
+        otherCenterX,
+      );
+      const otherY = otherGroundY - otherDefinition.height;
+
+      return (
+        x < otherCenterX + otherDefinition.width / 2 + 8 &&
+        x + definition.width + 8 >
+          otherCenterX - otherDefinition.width / 2 &&
+        y < otherY + otherDefinition.height &&
+        y + definition.height > otherY
+      );
+    });
+    const rulePlacement = this.createRuleCandidate(
+      type,
+      slotIndex,
+      centerX,
+    );
+    const rulesValid =
+      rulePlacement !== undefined &&
+      validatePlayerPlacement(rulePlacement).valid;
+    const reason = !insideField
+      ? "outside"
+      : !stableSupport
+        ? "support"
+        : overlapsCatapult || overlapsProtection
+          ? "overlap"
+          : !rulesValid
+            ? "rules"
+            : null;
+
+    return {
+      centerX,
+      x,
+      y,
+      valid: reason === null,
+      reason,
+    };
+  }
+
+  private createRuleCandidate(
+    type: ProtectionType,
+    slotIndex: number | undefined,
+    centerX: number,
+  ): PlayerPlacement | undefined {
+    const placement = this.draft[this.currentPlayerId];
+    if (slotIndex !== undefined) {
+      return {
+        ...placement,
+        protections: placement.protections.map((item) =>
+          item.slotIndex === slotIndex
+            ? { ...item, x: centerX }
+            : item,
+        ),
+      };
+    }
+
+    const freeSlotIndex = this.getFreeProtectionSlotIndex();
+    if (freeSlotIndex === undefined) {
+      return undefined;
+    }
+
+    return {
       ...placement,
       protections: [
-        ...withoutSlot,
-        { slotIndex, type: this.selectedTool },
+        ...placement.protections,
+        { slotIndex: freeSlotIndex, type, x: centerX },
       ],
     };
-    const validation = validatePlayerPlacement(candidate);
+  }
 
-    if (!validation.valid) {
-      this.statusMessage =
-        validation.reason === "over-budget"
-          ? STRINGS_RU.placementErrorBudget
-          : validation.reason === "too-many-metal"
-            ? STRINGS_RU.placementErrorMetal
-            : STRINGS_RU.placementErrorCount;
-      this.drawPlayerSetup();
-      return;
-    }
+  private getFreeProtectionSlotIndex(): number | undefined {
+    const used = new Set(
+      this.draft[this.currentPlayerId].protections.map(
+        ({ slotIndex }) => slotIndex,
+      ),
+    );
 
-    this.draft[this.currentPlayerId] = candidate;
+    const freeIndex = GAME_CONFIG.placement.protectionSlotCenters[
+      this.currentPlayerId
+    ].findIndex((_, index) => !used.has(index));
+
+    return freeIndex >= 0 ? freeIndex : undefined;
+  }
+
+  private getPlacementRulesError(
+    type: ProtectionType,
+    slotIndex: number | undefined,
+  ): string {
+    const candidate = this.createRuleCandidate(type, slotIndex, 0);
+    const reason = candidate
+      ? validatePlayerPlacement(candidate).reason
+      : "too-many-protections";
+
+    return reason === "over-budget"
+      ? STRINGS_RU.placementErrorBudget
+      : reason === "too-many-metal"
+        ? STRINGS_RU.placementErrorMetal
+        : STRINGS_RU.placementErrorCount;
+  }
+
+  private removeProtection(slotIndex: number): void {
+    const placement = this.draft[this.currentPlayerId];
+    placement.protections = placement.protections.filter(
+      (item) => item.slotIndex !== slotIndex,
+    );
     this.statusMessage = STRINGS_RU.placementRecommended;
     this.drawPlayerSetup();
   }

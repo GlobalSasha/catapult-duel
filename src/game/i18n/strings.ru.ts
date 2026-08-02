@@ -55,7 +55,7 @@ export const STRINGS_RU = {
   placementFieldHint:
     "Расставляйте катапульту и защиту прямо на своей части поля",
   placementCatapultFieldLabel: "ВЫБЕРИТЕ ПОЗИЦИЮ НА ПОЛЕ",
-  placementProtectionLabel: "ЗАЩИТА · ВЫБЕРИТЕ МАТЕРИАЛ И СЛОТ",
+  placementProtectionLabel: "ЗАЩИТА · ПЕРЕТАЩИТЕ МАТЕРИАЛ НА ПОЛЕ",
   placementBudget: (spent: number, remaining: number) =>
     `БЮДЖЕТ ${spent}/4 · ОСТАЛОСЬ ${remaining}`,
   placementWood: "ДЕРЕВО · 1",
@@ -64,7 +64,11 @@ export const STRINGS_RU = {
   placementErase: "УБРАТЬ",
   placementReset: "СБРОСИТЬ",
   placementReady: "ГОТОВО",
-  placementRecommended: "Стартовая схема уже заполнена — её можно изменить",
+  placementRecommended: "Тяните укрытия пальцем · уже поставленные тоже двигаются",
+  placementDropValid: "МОЖНО ПОСТАВИТЬ",
+  placementDropInvalid: "НЕЛЬЗЯ ПОСТАВИТЬ ЗДЕСЬ",
+  placementErrorOverlap: "Укрытие пересекается с катапультой или другим объектом",
+  placementErrorSupport: "Здесь слишком неровная поверхность",
   placementErrorBudget: "Не хватает бюджета защиты",
   placementErrorCount: "Можно поставить не более трёх объектов",
   placementErrorMetal: "Разрешён только один металлический лист",

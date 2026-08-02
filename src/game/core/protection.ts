@@ -7,7 +7,7 @@ import type { PlayerId } from "./battleTypes";
 import { GAME_CONFIG } from "./gameConfig";
 import {
   createDefaultMatchPlacement,
-  getProtectionSlotCenterX,
+  getProtectionPlacementCenterX,
   type MatchPlacement,
 } from "./placement";
 
@@ -51,9 +51,13 @@ export function createDefaultProtections(
   const arena = getArenaDefinition(arenaId);
 
   return (["left", "right"] as const).flatMap((ownerId) =>
-    matchPlacement[ownerId].protections.map(({ type, slotIndex }) => {
+    matchPlacement[ownerId].protections.map((placement) => {
+      const { type, slotIndex } = placement;
       const definition = getProtectionDefinition(type);
-      const centerX = getProtectionSlotCenterX(ownerId, slotIndex);
+      const centerX = getProtectionPlacementCenterX(
+        ownerId,
+        placement,
+      );
       const x = centerX - definition.width / 2;
 
       return {

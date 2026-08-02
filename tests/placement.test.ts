@@ -82,6 +82,25 @@ describe("pre-match placement", () => {
     );
   });
 
+  it("preserves a freely dragged protection position in battle", () => {
+    const placement = createDefaultMatchPlacement();
+    placement.left.protections = [
+      { slotIndex: 0, type: "wood", x: 356 },
+    ];
+    const state = createInitialBattleState(
+      "highlands",
+      GAME_CONFIG.weather.defaultMatchSeed,
+      placement,
+    );
+    const protection = state.protections.find(
+      ({ ownerId }) => ownerId === "left",
+    );
+
+    expect(protection?.x).toBe(
+      356 - GAME_CONFIG.protections.wood.width / 2,
+    );
+  });
+
   it("clones both players without sharing protection arrays", () => {
     const placement = createDefaultMatchPlacement();
     const cloned = cloneMatchPlacement(placement);
