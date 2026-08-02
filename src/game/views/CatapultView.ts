@@ -113,7 +113,7 @@ export class CatapultView extends Phaser.GameObjects.Container {
     this.healthFill = new Phaser.GameObjects.Rectangle(
       scene,
       -50,
-      -110,
+      -142,
       100,
       9,
       VIEW_COLORS.health,
@@ -122,7 +122,7 @@ export class CatapultView extends Phaser.GameObjects.Container {
     const healthBackground = new Phaser.GameObjects.Rectangle(
       scene,
       0,
-      -110,
+      -142,
       108,
       17,
       VIEW_COLORS.healthBackground,
@@ -132,7 +132,7 @@ export class CatapultView extends Phaser.GameObjects.Container {
     this.healthText = new Phaser.GameObjects.Text(
       scene,
       0,
-      -131,
+      -163,
       "",
       {
         color: "#eaf1ff",
@@ -146,7 +146,7 @@ export class CatapultView extends Phaser.GameObjects.Container {
     const playerLabel = new Phaser.GameObjects.Text(
       scene,
       0,
-      -154,
+      -186,
       STRINGS_RU.playerName(playerNumber),
       {
         color: player.id === "left" ? "#9ec5ff" : "#ffb29b",
@@ -160,7 +160,7 @@ export class CatapultView extends Phaser.GameObjects.Container {
     this.activeText = new Phaser.GameObjects.Text(
       scene,
       0,
-      -176,
+      -208,
       STRINGS_RU.activePlayer,
       {
         color: "#ffd166",
@@ -198,7 +198,7 @@ export class CatapultView extends Phaser.GameObjects.Container {
     this.effectText = new Phaser.GameObjects.Text(
       scene,
       0,
-      -202,
+      -234,
       "",
       {
         color: "#ffb08f",
@@ -414,16 +414,17 @@ export class CatapultView extends Phaser.GameObjects.Container {
   }
 
   private getLoadedArmAngle(): number {
-    // The directional art already places the bucket toward the opponent.
-    // Keep the pullback below 25° so it never crosses back over the pivot.
-    const pullback =
-      8 + this.getPowerRatio() * 10 + this.getAngleRatio() * 6;
+    // Keep the bucket visibly on the opponent-facing side while loaded.
+    // The old negative angle made the arm nearly vertical, so the health
+    // overlay hid the bucket and made the catapult look reversed.
+    const forwardLean =
+      6 + this.getPowerRatio() * 6 + this.getAngleRatio() * 4;
 
-    return -this.horizontalDirection * pullback;
+    return this.horizontalDirection * forwardLean;
   }
 
   private getReleaseArmAngle(): number {
-    return this.horizontalDirection * (12 + this.getAngleRatio() * 18);
+    return this.horizontalDirection * (38 + this.getAngleRatio() * 12);
   }
 
   private applyLoadedPose(): void {
@@ -435,7 +436,7 @@ export class CatapultView extends Phaser.GameObjects.Container {
   getDamageLabelPosition(): { x: number; y: number } {
     return {
       x: this.x,
-      y: this.y - 190,
+      y: this.y - 222,
     };
   }
 }
