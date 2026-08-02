@@ -28,6 +28,7 @@ import {
 import { GAME_HEIGHT, GAME_WIDTH } from "../gameDimensions";
 import { STRINGS_RU } from "../i18n/strings.ru";
 import { CatapultView } from "../views/CatapultView";
+import { createCastleAmbientEffects } from "../views/CastleAmbientEffects";
 import {
   drawProtectionBody,
   PROTECTION_VIEW_COLORS,
@@ -110,6 +111,11 @@ export class PlacementScene extends Phaser.Scene {
         .setTint(index % 2 === 0 ? 0xffffff : 0xe6eef8)
         .setDepth(-100);
     }
+    createCastleAmbientEffects(
+      this,
+      this.arenaId,
+      backgroundSegmentCount,
+    );
     this.add
       .rectangle(
         0,

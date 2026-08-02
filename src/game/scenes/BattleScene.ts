@@ -43,6 +43,7 @@ import {
   type AimingValues,
 } from "../ui/AimingControls";
 import { CatapultView } from "../views/CatapultView";
+import { createCastleAmbientEffects } from "../views/CastleAmbientEffects";
 import { drawProtectionBody } from "../views/drawProtection";
 
 const COLORS = {
@@ -193,6 +194,7 @@ export class BattleScene extends Phaser.Scene {
         .setTint(index % 2 === 0 ? 0xffffff : 0xe6eef8)
         .setDepth(-100);
     }
+    createCastleAmbientEffects(this, this.arenaId, segmentCount);
 
     this.add
       .rectangle(
