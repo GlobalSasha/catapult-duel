@@ -4,9 +4,10 @@ export const GAME_CONFIG = {
     height: 900,
   },
   world: {
-    width: 7200,
+    width: 5400,
     height: 900,
     outOfBoundsMargin: 100,
+    verticalOutOfBoundsMargin: 1600,
   },
   physics: {
     stepHz: 180,
@@ -176,11 +177,11 @@ export const GAME_CONFIG = {
   placement: {
     catapultSlots: {
       left: [480, 600, 720],
-      right: [6720, 6600, 6480],
+      right: [4920, 4800, 4680],
     },
     protectionSlotCenters: {
       left: [330, 400, 820, 900, 970],
-      right: [6870, 6800, 6380, 6300, 6230],
+      right: [5070, 5000, 4580, 4500, 4430],
     },
     protectionBudget: 4,
     maximumProtectionCount: 3,

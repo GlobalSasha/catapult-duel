@@ -26,12 +26,12 @@ const BALLISTICS_ENVIRONMENT: ShotSimulationEnvironment = {
 };
 
 const REACHABLE_SHOTS = [
-  ["stone", 22],
-  ["fire", 19],
-  ["ice", 24],
-  ["diamond", 24],
-  ["bomb", 26],
-] as const satisfies readonly (readonly [ProjectileType, number])[];
+  ["stone", 20, 90],
+  ["fire", 20, 84],
+  ["ice", 20, 93],
+  ["diamond", 20, 94],
+  ["bomb", 20, 96],
+] as const satisfies readonly (readonly [ProjectileType, number, number])[];
 
 function createCalmState() {
   const state = createInitialBattleState();
@@ -123,13 +123,7 @@ describe("calculateLaunchVelocity", () => {
 });
 
 describe("simulateShot", () => {
-  it.each<readonly [ProjectileType, number, number]>([
-    ["stone", 22, 99],
-    ["fire", 19, 99],
-    ["ice", 24, 99],
-    ["diamond", 24, 100],
-    ["bomb", 26, 99],
-  ])(
+  it.each(REACHABLE_SHOTS)(
     "keeps %s capable of reaching the opponent",
     (projectileType, angleDeg, power) => {
       const result = simulateShot(
@@ -155,7 +149,7 @@ describe("simulateShot", () => {
   ] as const)(
     "keeps every projectile viable in %s with the strongest headwind",
     (weatherId, wind) => {
-      for (const [projectileType, angleDeg] of REACHABLE_SHOTS) {
+      for (const [projectileType, angleDeg, power] of REACHABLE_SHOTS) {
         const state = createInitialBattleState();
         state.weather.id = weatherId;
         state.weather.wind = wind;
@@ -164,7 +158,7 @@ describe("simulateShot", () => {
           {
             playerId: "left",
             angleDeg,
-            power: 100,
+            power,
             projectileType,
           },
           state,
@@ -219,6 +213,7 @@ describe("simulateShot", () => {
 
   it("produces mirrored trajectories for both players", () => {
     const state = createCalmState();
+    state.players.right.catapultY = state.players.left.catapultY;
     const leftResult = simulateShot(
       BASE_COMMAND,
       state,

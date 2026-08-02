@@ -120,9 +120,10 @@ export class BattleScene extends Phaser.Scene {
     );
     this.cameras.main.setBounds(
       0,
-      0,
+      -GAME_CONFIG.world.verticalOutOfBoundsMargin,
       GAME_CONFIG.world.width,
-      GAME_CONFIG.world.height,
+      GAME_CONFIG.world.height +
+        GAME_CONFIG.world.verticalOutOfBoundsMargin,
     );
 
     this.drawArena();
@@ -179,7 +180,8 @@ export class BattleScene extends Phaser.Scene {
 
   private drawArena(): void {
     const arena = getArenaDefinition(this.arenaId);
-    const segmentCount = 3;
+    const segmentCount =
+      Math.ceil(GAME_CONFIG.world.width / GAME_WIDTH) + 1;
 
     for (let index = 0; index < segmentCount; index += 1) {
       this.add
@@ -553,7 +555,8 @@ export class BattleScene extends Phaser.Scene {
     for (let index = 0; index < 24; index += 1) {
       const mote = this.add
         .circle(
-          160 + ((index * 307) % 6800),
+          160 +
+            ((index * 307) % (GAME_CONFIG.world.width - 320)),
           360 + ((index * 83) % 300),
           2 + (index % 3),
           this.arenaId === "highlands" ? 0xa8e6ff : 0xffbd78,

@@ -64,6 +64,8 @@ export function createShotEnvironment(
     worldWidth: GAME_CONFIG.world.width,
     worldHeight: GAME_CONFIG.world.height,
     outOfBoundsMargin: GAME_CONFIG.world.outOfBoundsMargin,
+    verticalOutOfBoundsMargin:
+      GAME_CONFIG.world.verticalOutOfBoundsMargin,
     projectileRadius: GAME_CONFIG.projectiles[projectileType].radius,
     catapultColliderWidth: GAME_CONFIG.catapult.colliderWidth,
     catapultColliderHeight: GAME_CONFIG.catapult.colliderHeight,
@@ -125,11 +127,12 @@ function isOutsideWorld(
   environment: ShotSimulationEnvironment,
 ): boolean {
   const margin = environment.outOfBoundsMargin;
+  const verticalMargin = environment.verticalOutOfBoundsMargin;
 
   return (
     point.x < -margin ||
     point.x > environment.worldWidth + margin ||
-    point.y < -margin ||
+    point.y < -verticalMargin ||
     point.y > environment.worldHeight + margin
   );
 }

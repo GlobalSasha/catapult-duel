@@ -15,7 +15,7 @@ import {
 describe("large arenas", () => {
   it("keeps opposing catapults outside one viewport", () => {
     expect(GAME_CONFIG.world.width).toBe(
-      GAME_CONFIG.viewport.width * 4.5,
+      GAME_CONFIG.viewport.width * 3.375,
     );
 
     ARENAS.forEach((arena) => {
@@ -36,6 +36,19 @@ describe("large arenas", () => {
         getTerrainHeightAt(arena.terrain, arena.spawnX.right),
       );
     });
+  });
+
+  it("gives the arenas opposite height advantages", () => {
+    const highlands = createInitialBattleState("highlands");
+    const canyon = createInitialBattleState("canyon");
+
+    expect(
+      highlands.players.left.catapultY -
+        highlands.players.right.catapultY,
+    ).toBeGreaterThanOrEqual(120);
+    expect(
+      canyon.players.right.catapultY - canyon.players.left.catapultY,
+    ).toBeGreaterThanOrEqual(120);
   });
 
   it("interpolates slopes and detects the visible terrain surface", () => {

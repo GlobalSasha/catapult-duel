@@ -99,7 +99,9 @@ export class PlacementScene extends Phaser.Scene {
       GAME_CONFIG.world.width,
       GAME_CONFIG.world.height,
     );
-    for (let index = 0; index < 3; index += 1) {
+    const backgroundSegmentCount =
+      Math.ceil(GAME_CONFIG.world.width / GAME_WIDTH) + 1;
+    for (let index = 0; index < backgroundSegmentCount; index += 1) {
       this.add
         .image(index * GAME_WIDTH, 0, arena.textureKey)
         .setOrigin(0)

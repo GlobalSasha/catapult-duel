@@ -27,7 +27,7 @@ function createUnprotectedState() {
 describe("collision and damage", () => {
   it("damages the target once on a direct hit", () => {
     const state = createUnprotectedState();
-    const shot = simulateShot(command(22, 100), state);
+    const shot = simulateShot(command(20, 90), state);
     const nextState = applyShotDamage(state, shot);
 
     expect(shot.endReason).toBe("impact");

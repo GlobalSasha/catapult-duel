@@ -100,6 +100,7 @@ export interface ShotSimulationEnvironment {
   terrain: readonly TerrainPoint[];
   obstacles: readonly ShotCollider[];
   outOfBoundsMargin: number;
+  verticalOutOfBoundsMargin: number;
   projectileRadius: number;
   catapultColliderWidth: number;
   catapultColliderHeight: number;
