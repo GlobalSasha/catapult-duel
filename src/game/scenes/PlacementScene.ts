@@ -67,7 +67,6 @@ export class PlacementScene extends Phaser.Scene {
   private statusMessage: string = STRINGS_RU.placementRecommended;
   private statusText?: Phaser.GameObjects.Text;
   private dragPreview?: Phaser.GameObjects.Graphics;
-  private dragPreviewGlow?: Phaser.GameObjects.Rectangle;
   private dragCandidate?: ProtectionDropCandidate;
 
   constructor() {
@@ -559,7 +558,6 @@ export class PlacementScene extends Phaser.Scene {
     this.dynamicObjects = [];
     this.statusText = undefined;
     this.dragPreview = undefined;
-    this.dragPreviewGlow = undefined;
     this.dragCandidate = undefined;
   }
 
@@ -599,9 +597,6 @@ export class PlacementScene extends Phaser.Scene {
     pointer: Phaser.Input.Pointer,
   ): void {
     this.dragPreview = this.track(this.add.graphics().setDepth(63));
-    this.dragPreviewGlow = this.track(
-      this.add.rectangle(0, 0, 1, 1, COLORS.mint, 0.08).setDepth(62),
-    );
     this.updateProtectionDrag(type, slotIndex, pointer);
   }
 
@@ -616,7 +611,6 @@ export class PlacementScene extends Phaser.Scene {
       pointer,
     );
     const definition = getProtectionDefinition(type);
-    const color = candidate.valid ? COLORS.mint : COLORS.coral;
 
     this.dragCandidate = candidate;
     this.dragPreview?.clear();
@@ -630,17 +624,6 @@ export class PlacementScene extends Phaser.Scene {
       });
       this.dragPreview.setAlpha(candidate.valid ? 0.92 : 0.42);
     }
-    this.dragPreviewGlow
-      ?.setPosition(
-        candidate.centerX,
-        candidate.y + definition.height / 2,
-      )
-      .setDisplaySize(
-        definition.width + 22,
-        definition.height + 22,
-      )
-      .setFillStyle(color, 0.09)
-      .setStrokeStyle(4, color, 0.92);
     this.statusText
       ?.setText(
         candidate.valid
