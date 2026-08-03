@@ -109,7 +109,10 @@ export class CatapultView extends Phaser.GameObjects.Container {
       body,
       this.armContainer,
       ...this.wheelContainers,
-    ]).setScale(GAME_CONFIG.catapult.visualScale);
+    ]).setScale(
+      -GAME_CONFIG.catapult.visualScale,
+      GAME_CONFIG.catapult.visualScale,
+    );
 
     this.healthFill = new Phaser.GameObjects.Rectangle(
       scene,
@@ -416,8 +419,8 @@ export class CatapultView extends Phaser.GameObjects.Container {
   }
 
   private getLoadedArmAngle(): number {
-    // Each player has dedicated left/right artwork, so the arm animation
-    // follows the shot direction without reflecting the whole catapult.
+    // The cup stays behind the axle: the left catapult launches right and
+    // the right catapult launches left after the authored art is mirrored.
     const forwardLean =
       6 + this.getPowerRatio() * 6 + this.getAngleRatio() * 4;
 
