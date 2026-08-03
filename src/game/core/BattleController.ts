@@ -24,6 +24,7 @@ export type FireErrorReason =
   | "not-active-player"
   | "invalid-angle"
   | "invalid-power"
+  | "invalid-launch-point"
   | "power-restricted"
   | "invalid-projectile"
   | "projectile-not-selected"
@@ -285,6 +286,14 @@ export class BattleController {
       )
     ) {
       return "invalid-power";
+    }
+
+    if (
+      command.launchPoint &&
+      (!Number.isFinite(command.launchPoint.x) ||
+        !Number.isFinite(command.launchPoint.y))
+    ) {
+      return "invalid-launch-point";
     }
 
     if (!isProjectileType(command.projectileType)) {

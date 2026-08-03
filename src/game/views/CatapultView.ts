@@ -2,7 +2,9 @@ import * as Phaser from "phaser";
 
 import type { PlayerState } from "../core/battleTypes";
 import { GAME_CONFIG } from "../core/gameConfig";
+import type { ProjectileType } from "../core/projectileCatalog";
 import { STRINGS_RU } from "../i18n/strings.ru";
+import { PROJECTILE_TEXTURE_KEYS } from "./projectileVisuals";
 
 const VIEW_COLORS = {
   left: {
@@ -26,6 +28,7 @@ const CATAPULT_ART = {
     armSize: { width: 190, height: 127 },
     armPivot: { x: -22, y: -73 },
     armOrigin: { x: 370 / 1536, y: 830 / 1024 },
+    cupAnchor: { x: 105, y: -70 },
     wheelPositions: [
       { x: -55, y: -14 },
       { x: 54, y: -14 },
@@ -40,6 +43,7 @@ const CATAPULT_ART = {
     armSize: { width: 190, height: 127 },
     armPivot: { x: 5, y: -78 },
     armOrigin: { x: 1070 / 1536, y: 810 / 1024 },
+    cupAnchor: { x: -82, y: -70 },
     wheelPositions: [
       { x: -75, y: -14 },
       { x: 52, y: -14 },
@@ -56,11 +60,13 @@ export class CatapultView extends Phaser.GameObjects.Container {
   private readonly effectText: Phaser.GameObjects.Text;
   private readonly bodyContainer: Phaser.GameObjects.Container;
   private readonly armContainer: Phaser.GameObjects.Container;
+  private readonly loadedProjectile: Phaser.GameObjects.Image;
   private readonly wheelContainers: readonly Phaser.GameObjects.Container[];
   private readonly horizontalDirection: 1 | -1;
   private angleDeg: number = GAME_CONFIG.aiming.initialAngleDeg;
   private power: number = GAME_CONFIG.aiming.initialPower;
   private firing = false;
+  private loadedProjectileVisibleWhenReady = false;
 
   constructor(
     scene: Phaser.Scene,
@@ -95,11 +101,17 @@ export class CatapultView extends Phaser.GameObjects.Container {
     const arm = new Phaser.GameObjects.Image(scene, 0, 0, art.armKey)
       .setOrigin(art.armOrigin.x, art.armOrigin.y)
       .setDisplaySize(art.armSize.width, art.armSize.height);
+    this.loadedProjectile = new Phaser.GameObjects.Image(
+      scene,
+      art.cupAnchor.x,
+      art.cupAnchor.y,
+      PROJECTILE_TEXTURE_KEYS[player.selectedProjectileType],
+    ).setDepth(2);
     this.armContainer = new Phaser.GameObjects.Container(
       scene,
       art.armPivot.x,
       art.armPivot.y,
-      [arm],
+      [arm, this.loadedProjectile],
     );
 
     this.wheelContainers = art.wheelPositions.map(({ x, y }) =>
@@ -228,6 +240,7 @@ export class CatapultView extends Phaser.GameObjects.Container {
       this.effectText,
     ]);
     this.setDepth(20);
+    this.setLoadedProjectile(player.selectedProjectileType, isActive);
     this.update(player, isActive);
     this.setAim(this.angleDeg, this.power);
   }
@@ -250,13 +263,21 @@ export class CatapultView extends Phaser.GameObjects.Container {
     return wheel;
   }
 
-  update(player: PlayerState, isActive: boolean): void {
+  update(
+    player: PlayerState,
+    isActive: boolean,
+    showLoadedProjectile: boolean = isActive,
+  ): void {
     const healthRatio = player.health / GAME_CONFIG.catapult.maxHealth;
 
     this.healthFill.setDisplaySize(100 * healthRatio, 9);
     this.healthText.setText(STRINGS_RU.health(player.health));
     this.activeText.setVisible(isActive);
     this.activeOutline.setVisible(isActive);
+    this.setLoadedProjectile(
+      player.selectedProjectileType,
+      showLoadedProjectile,
+    );
 
     const isFrozen = player.effects.frozenTurnsRemaining > 0;
     const isBurning = player.effects.burningTurnsRemaining > 0;
@@ -300,7 +321,31 @@ export class CatapultView extends Phaser.GameObjects.Container {
     this.applyLoadedPose();
   }
 
-  playFire(onRelease: () => void): void {
+  setLoadedProjectile(
+    projectileType: ProjectileType,
+    visible: boolean = true,
+  ): void {
+    const displaySize =
+      GAME_CONFIG.projectiles[projectileType].radius * 2.8;
+
+    this.loadedProjectileVisibleWhenReady = visible;
+    this.loadedProjectile
+      .setTexture(PROJECTILE_TEXTURE_KEYS[projectileType])
+      .setDisplaySize(displaySize, displaySize)
+      .setVisible(visible && !this.firing);
+  }
+
+  getLoadedProjectileWorldPosition(): { x: number; y: number } {
+    const point = this.loadedProjectile
+      .getWorldTransformMatrix()
+      .transformPoint(0, 0);
+
+    return { x: point.x, y: point.y };
+  }
+
+  playFire(
+    onRelease: (launchPoint: { x: number; y: number }) => void,
+  ): void {
     if (this.firing) {
       return;
     }
@@ -318,7 +363,10 @@ export class CatapultView extends Phaser.GameObjects.Container {
       duration: 270,
       ease: "Cubic.easeIn",
       onComplete: () => {
-        onRelease();
+        const launchPoint = this.getLoadedProjectileWorldPosition();
+        this.loadedProjectileVisibleWhenReady = false;
+        this.loadedProjectile.setVisible(false);
+        onRelease(launchPoint);
         this.scene.time.delayedCall(110, () => {
           this.scene.tweens.add({
             targets: this.armContainer,
@@ -328,6 +376,9 @@ export class CatapultView extends Phaser.GameObjects.Container {
             onComplete: () => {
               this.firing = false;
               this.applyLoadedPose();
+              this.loadedProjectile.setVisible(
+                this.loadedProjectileVisibleWhenReady,
+              );
             },
           });
         });

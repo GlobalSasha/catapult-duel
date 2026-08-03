@@ -123,6 +123,17 @@ describe("calculateLaunchVelocity", () => {
 });
 
 describe("simulateShot", () => {
+  it("starts the trajectory at the supplied catapult cup position", () => {
+    const launchPoint = { x: 712, y: 486 };
+    const result = simulateShot(
+      { ...BASE_COMMAND, launchPoint },
+      createCalmState(),
+      BALLISTICS_ENVIRONMENT,
+    );
+
+    expect(result.points[0]).toMatchObject(launchPoint);
+  });
+
   it.each(REACHABLE_SHOTS)(
     "keeps %s capable of reaching the opponent",
     (projectileType, angleDeg, power) => {

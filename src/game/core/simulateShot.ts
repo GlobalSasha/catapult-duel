@@ -156,9 +156,11 @@ export function simulateShot(
   const shooter = state.players[command.playerId];
   const horizontalDirection = command.playerId === "left" ? 1 : -1;
   const startX =
+    command.launchPoint?.x ??
     shooter.catapultX +
-    resolvedEnvironment.launchOffsetX * horizontalDirection;
+      resolvedEnvironment.launchOffsetX * horizontalDirection;
   const startY =
+    command.launchPoint?.y ??
     shooter.catapultY + resolvedEnvironment.launchOffsetY;
   const velocity = calculateLaunchVelocity(
     command.playerId,

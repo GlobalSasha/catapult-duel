@@ -87,6 +87,18 @@ describe("BattleController", () => {
     );
   });
 
+  it("rejects a non-finite catapult cup position", () => {
+    const controller = new BattleController();
+
+    expectFireError(
+      controller.fire({
+        ...createCommand(),
+        launchPoint: { x: Number.NaN, y: 420 },
+      }),
+      "invalid-launch-point",
+    );
+  });
+
   it("owns an independent copy of the initial state", () => {
     const initialState = createInitialBattleState();
     const controller = new BattleController(initialState);

@@ -109,6 +109,7 @@ export class BattleScene extends Phaser.Scene {
   private matchPlacement: MatchPlacement = createDefaultMatchPlacement();
   private matchSettings: MatchSettings = readMatchSettings(undefined);
   private aiThinking = false;
+  private launchInProgress = false;
   private audioContext: AudioContext | null = null;
 
   constructor() {
@@ -121,6 +122,7 @@ export class BattleScene extends Phaser.Scene {
       this.registry.get(MATCH_SETTINGS_REGISTRY_KEY),
     );
     this.aiThinking = false;
+    this.launchInProgress = false;
     this.cachedPreviewPoints = [];
     this.previewDashOffset = 0;
     this.previewShimmerPhase = 0;
@@ -1212,10 +1214,14 @@ export class BattleScene extends Phaser.Scene {
     this.catapultViews.left.update(
       battleState.players.left,
       battleState.activePlayerId === "left",
+      battleState.phase === "aiming" &&
+        battleState.activePlayerId === "left",
     );
     this.catapultViews.right.update(
       battleState.players.right,
       battleState.activePlayerId === "right",
+      battleState.phase === "aiming" &&
+        battleState.activePlayerId === "right",
     );
     const activePlayer = battleState.players[battleState.activePlayerId];
 
@@ -1255,13 +1261,13 @@ export class BattleScene extends Phaser.Scene {
       return;
     }
 
-    const result = simulateShot(
-      this.createFireCommand(values),
-      battleState,
-    );
     this.catapultViews[battleState.activePlayerId].setAim(
       values.angleDeg,
       values.power,
+    );
+    const result = simulateShot(
+      this.createFireCommand(values),
+      battleState,
     );
     const pointCount = Math.max(
       2,
@@ -1370,14 +1376,23 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  private createFireCommand(values: AimingValues): FireCommand {
+  private createFireCommand(
+    values: AimingValues,
+    launchPoint?: { x: number; y: number },
+  ): FireCommand {
     const battleState = this.battleController.getState();
+    const resolvedLaunchPoint =
+      launchPoint ??
+      this.catapultViews[
+        battleState.activePlayerId
+      ].getLoadedProjectileWorldPosition();
 
     return {
       playerId: battleState.activePlayerId,
       angleDeg: values.angleDeg,
       power: values.power,
       projectileType: values.projectileType,
+      launchPoint: resolvedLaunchPoint,
     };
   }
 
@@ -1399,6 +1414,10 @@ export class BattleScene extends Phaser.Scene {
     this.aimingControls.setProjectileState(
       activePlayer.selectedProjectileType,
       activePlayer.ammunition,
+    );
+    this.catapultViews[battleState.activePlayerId].setLoadedProjectile(
+      activePlayer.selectedProjectileType,
+      true,
     );
     return true;
   }
@@ -1434,28 +1453,40 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private fire(values: AimingValues): void {
-    const result = this.battleController.fire(
-      this.createFireCommand(values),
-    );
-
-    if (!result.ok) {
-      if (result.reason === "power-restricted") {
-        this.statusText.setText(
-          STRINGS_RU.frozenPowerUnavailableStatus,
-        );
-      } else if (result.reason !== "wrong-phase") {
-        this.statusText.setText(STRINGS_RU.fireUnavailableStatus);
-      }
+    if (this.launchInProgress) {
       return;
     }
 
-    this.aimingControls.setEnabled(false);
-    this.previewGraphics.clear();
-    this.statusText.setText(STRINGS_RU.projectileFlightStatus);
     const activePlayerId =
       this.battleController.getState().activePlayerId;
+    this.launchInProgress = true;
+    this.aimingControls.setEnabled(false);
+    this.cachedPreviewPoints = [];
+    this.previewGraphics.clear();
+    this.statusText.setText(STRINGS_RU.projectileFlightStatus);
 
-    this.catapultViews[activePlayerId].playFire(() => {
+    this.catapultViews[activePlayerId].playFire((launchPoint) => {
+      const result = this.battleController.fire(
+        this.createFireCommand(values, launchPoint),
+      );
+
+      if (!result.ok) {
+        this.launchInProgress = false;
+        this.aimingControls.setEnabled(true);
+        this.catapultViews[activePlayerId].setLoadedProjectile(
+          values.projectileType,
+          true,
+        );
+        if (result.reason === "power-restricted") {
+          this.statusText.setText(
+            STRINGS_RU.frozenPowerUnavailableStatus,
+          );
+        } else if (result.reason !== "wrong-phase") {
+          this.statusText.setText(STRINGS_RU.fireUnavailableStatus);
+        }
+        return;
+      }
+
       this.playLaunchSound();
       this.animateShot(result.shot);
     });
@@ -1539,6 +1570,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private finishShot(shot: ShotResult): void {
+    this.launchInProgress = false;
     this.fogOfWar.setAlpha(0.42);
     const transition = this.battleController.resolveShot(shot);
     const resolvedState = transition.state;

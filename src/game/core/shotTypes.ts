@@ -7,6 +7,10 @@ export interface FireCommand {
   angleDeg: number;
   power: number;
   projectileType: ProjectileType;
+  launchPoint?: {
+    x: number;
+    y: number;
+  };
 }
 
 export interface FlightPoint {
