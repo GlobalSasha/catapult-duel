@@ -338,14 +338,17 @@ export class AimingControls extends Phaser.GameObjects.Container {
       repeat: -1,
       ease: "Sine.easeInOut",
     });
-    scene.tweens.add({
-      targets: this.projectileButtons.map((button) => button.marker),
-      scale: 1.12,
-      duration: 900,
-      yoyo: true,
-      repeat: -1,
-      stagger: 120,
-      ease: "Sine.easeInOut",
+    this.projectileButtons.forEach((button, index) => {
+      scene.tweens.add({
+        targets: button.marker,
+        y: button.marker.y - 2,
+        angle: index % 2 === 0 ? 1.5 : -1.5,
+        duration: 960 + index * 80,
+        delay: index * 90,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.easeInOut",
+      });
     });
     this.updateProjectileButtons();
   }
@@ -530,7 +533,7 @@ export class AimingControls extends Phaser.GameObjects.Container {
       x,
       y,
       PROJECTILE_TEXTURE_KEYS[projectileType],
-    ).setDisplaySize(42, 42);
+    ).setDisplaySize(36, 36);
   }
 
   private createSlider(options: {
