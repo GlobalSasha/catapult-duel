@@ -109,10 +109,7 @@ export class CatapultView extends Phaser.GameObjects.Container {
       body,
       this.armContainer,
       ...this.wheelContainers,
-    ]).setScale(
-      -GAME_CONFIG.catapult.visualScale,
-      GAME_CONFIG.catapult.visualScale,
-    );
+    ]).setScale(GAME_CONFIG.catapult.visualScale);
 
     this.healthFill = new Phaser.GameObjects.Rectangle(
       scene,
@@ -419,8 +416,8 @@ export class CatapultView extends Phaser.GameObjects.Container {
   }
 
   private getLoadedArmAngle(): number {
-    // The body-level reflection places the bucket behind the axle while
-    // preserving the authored loaded pose and firing animation.
+    // Each player has dedicated left/right artwork, so the arm animation
+    // follows the shot direction without reflecting the whole catapult.
     const forwardLean =
       6 + this.getPowerRatio() * 6 + this.getAngleRatio() * 4;
 
