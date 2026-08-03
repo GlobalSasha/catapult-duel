@@ -13,6 +13,11 @@ import { BattleController } from "../core/BattleController";
 import type { PlayerId } from "../core/battleTypes";
 import { createInitialBattleState } from "../core/createInitialBattleState";
 import { GAME_CONFIG } from "../core/gameConfig";
+import {
+  MATCH_SETTINGS_REGISTRY_KEY,
+  readMatchSettings,
+  type MatchSettings,
+} from "../core/matchSession";
 import { getPlayerMaximumPower } from "../core/projectileEffects";
 import type { ProtectionState } from "../core/protection";
 import {
@@ -38,6 +43,14 @@ import {
 } from "../core/weather";
 import { GAME_HEIGHT, GAME_WIDTH } from "../gameDimensions";
 import { STRINGS_RU } from "../i18n/strings.ru";
+import {
+  center2KCameraOn,
+  configure2KCamera,
+  follow2KCameraOnStep,
+  pan2KCameraOn,
+  set2KCameraBounds,
+  sharpenSceneText,
+} from "../rendering";
 import {
   AimingControls,
   type AimingValues,
@@ -94,6 +107,8 @@ export class BattleScene extends Phaser.Scene {
   >();
   private arenaId: ArenaId = DEFAULT_ARENA_ID;
   private matchPlacement: MatchPlacement = createDefaultMatchPlacement();
+  private matchSettings: MatchSettings = readMatchSettings(undefined);
+  private aiThinking = false;
   private audioContext: AudioContext | null = null;
 
   constructor() {
@@ -101,6 +116,11 @@ export class BattleScene extends Phaser.Scene {
   }
 
   create(data: BattleSceneData): void {
+    configure2KCamera(this);
+    this.matchSettings = readMatchSettings(
+      this.registry.get(MATCH_SETTINGS_REGISTRY_KEY),
+    );
+    this.aiThinking = false;
     this.cachedPreviewPoints = [];
     this.previewDashOffset = 0;
     this.previewShimmerPhase = 0;
@@ -120,7 +140,8 @@ export class BattleScene extends Phaser.Scene {
         this.matchPlacement,
       ),
     );
-    this.cameras.main.setBounds(
+    set2KCameraBounds(
+      this,
       0,
       -GAME_CONFIG.world.verticalOutOfBoundsMargin,
       GAME_CONFIG.world.width,
@@ -178,6 +199,7 @@ export class BattleScene extends Phaser.Scene {
     this.renderBattleState();
     this.centerCameraOnActivePlayer();
     this.redrawPreview(this.aimingControls.getValues());
+    sharpenSceneText(this);
   }
 
   private drawArena(): void {
@@ -1161,7 +1183,7 @@ export class BattleScene extends Phaser.Scene {
     const state = this.battleController.getState();
     const activePlayer = state.players[state.activePlayerId];
 
-    this.cameras.main.centerOn(activePlayer.catapultX, GAME_HEIGHT / 2);
+    center2KCameraOn(this, activePlayer.catapultX, GAME_HEIGHT / 2);
     this.updateWorldMarker(activePlayer.catapultX);
   }
 
@@ -1173,11 +1195,13 @@ export class BattleScene extends Phaser.Scene {
         this,
         battleState.players.left,
         battleState.activePlayerId === "left",
+        this.matchSettings.playerNames.left,
       ),
       right: new CatapultView(
         this,
         battleState.players.right,
         battleState.activePlayerId === "right",
+        this.matchSettings.playerNames.right,
       ),
     };
   }
@@ -1384,6 +1408,10 @@ export class BattleScene extends Phaser.Scene {
       return;
     }
 
+    if (this.isAiTurn()) {
+      return;
+    }
+
     if (event.code.startsWith("Digit")) {
       const index = Number(event.code.slice(5)) - 1;
       const projectileType = PROJECTILE_TYPES[index];
@@ -1452,7 +1480,6 @@ export class BattleScene extends Phaser.Scene {
     let nextTrailPointIndex = 2;
 
     this.fogOfWar.setAlpha(0.82);
-    this.cameras.main.startFollow(projectile, true, 0.12, 0.12);
     this.tweens.add({
       targets: animationClock,
       timeMs: lastPoint.timeMs,
@@ -1490,6 +1517,7 @@ export class BattleScene extends Phaser.Scene {
           Phaser.Math.Linear(from.x, to.x, progress),
           Phaser.Math.Linear(from.y, to.y, progress),
         );
+        follow2KCameraOnStep(this, projectile.x, projectile.y);
         this.updateWorldMarker(projectile.x);
         projectile.setRotation(animationClock.timeMs * 0.012);
 
@@ -1511,7 +1539,6 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private finishShot(shot: ShotResult): void {
-    this.cameras.main.stopFollow();
     this.fogOfWar.setAlpha(0.42);
     const transition = this.battleController.resolveShot(shot);
     const resolvedState = transition.state;
@@ -1625,11 +1652,11 @@ export class BattleScene extends Phaser.Scene {
 
     const activePlayer = battleState.players[battleState.activePlayerId];
 
-    this.cameras.main.pan(
+    pan2KCameraOn(
+      this,
       activePlayer.catapultX,
       GAME_HEIGHT / 2,
       GAME_CONFIG.battle.cameraPanMs,
-      "Sine.easeInOut",
     );
     this.updateWorldMarker(activePlayer.catapultX);
     this.statusText.setText(
@@ -1637,8 +1664,13 @@ export class BattleScene extends Phaser.Scene {
         ? STRINGS_RU.burnDamageStatus(burnDamage)
         : this.getAimingStatus(),
     );
-    this.aimingControls.setEnabled(true);
+    const aiTurn = this.isAiTurn();
+    this.aimingControls.setEnabled(!aiTurn);
     this.redrawPreview(this.aimingControls.getValues());
+
+    if (aiTurn) {
+      this.scheduleAiTurn(GAME_CONFIG.battle.cameraPanMs + 300);
+    }
 
     if (burnDamage > 0) {
       this.time.delayedCall(700, () => {
@@ -1651,12 +1683,118 @@ export class BattleScene extends Phaser.Scene {
 
   private getAimingStatus(): string {
     const battleState = this.battleController.getState();
-    const playerNumber = battleState.activePlayerId === "left" ? 1 : 2;
-
-    return STRINGS_RU.aimingStatus(
+    return STRINGS_RU.aimingStatusForName(
       battleState.turnNumber,
-      playerNumber,
+      this.matchSettings.playerNames[battleState.activePlayerId],
     );
+  }
+
+  private isAiTurn(): boolean {
+    const battleState = this.battleController.getState();
+    return (
+      this.matchSettings.mode === "ai" &&
+      battleState.phase === "aiming" &&
+      battleState.activePlayerId === "right"
+    );
+  }
+
+  private scheduleAiTurn(delay: number): void {
+    if (!this.isAiTurn() || this.aiThinking) {
+      return;
+    }
+
+    this.aiThinking = true;
+    this.statusText.setText(
+      STRINGS_RU.aiThinkingStatus(
+        STRINGS_RU.aiDifficultyName(this.matchSettings.aiDifficulty),
+      ),
+    );
+    this.time.delayedCall(delay, () => {
+      if (!this.isAiTurn()) {
+        this.aiThinking = false;
+        return;
+      }
+
+      const values = this.chooseAiAimingValues();
+      this.selectProjectile(values.projectileType);
+      this.catapultViews.right.setAim(values.angleDeg, values.power);
+      this.redrawPreview(values);
+      this.time.delayedCall(520, () => {
+        this.aiThinking = false;
+        if (this.isAiTurn()) {
+          this.fire(values);
+        }
+      });
+    });
+  }
+
+  private chooseAiAimingValues(): AimingValues {
+    const state = this.battleController.getState();
+    const activePlayer = state.players.right;
+    const difficulty = this.matchSettings.aiDifficulty;
+    const projectileTypes =
+      difficulty === "hard"
+        ? PROJECTILE_TYPES.filter((type) => {
+            const ammunition = activePlayer.ammunition[type];
+            return ammunition === null || ammunition > 0;
+          })
+        : (["stone"] as const satisfies readonly ProjectileType[]);
+    const angleStep = difficulty === "hard" ? 2 : difficulty === "normal" ? 4 : 6;
+    const powerStep = difficulty === "hard" ? 2 : difficulty === "normal" ? 4 : 7;
+    const maximumPower = getPlayerMaximumPower(activePlayer);
+    const targetX = state.players.left.catapultX;
+    let best: { values: AimingValues; score: number } | undefined;
+
+    for (const projectileType of projectileTypes) {
+      for (let angleDeg = GAME_CONFIG.aiming.minAngleDeg; angleDeg <= GAME_CONFIG.aiming.maxAngleDeg; angleDeg += angleStep) {
+        for (let power = Math.max(40, GAME_CONFIG.aiming.minPower); power <= maximumPower; power += powerStep) {
+          const result = simulateShot(
+            { playerId: "right", angleDeg, power, projectileType },
+            state,
+          );
+          const lastPoint = result.points.at(-1);
+          const hitScore = result.impact?.targetId === "left" ? 100_000 + result.impact.damage * 500 : 0;
+          const obstacleScore = result.objectImpact ? 8_000 : 0;
+          const distanceScore = lastPoint ? -Math.abs(lastPoint.x - targetX) : -20_000;
+          const score = hitScore + obstacleScore + distanceScore;
+
+          if (!best || score > best.score) {
+            best = {
+              score,
+              values: { angleDeg, power, projectileType },
+            };
+          }
+        }
+      }
+    }
+
+    const fallback: AimingValues = {
+      angleDeg: 42,
+      power: Math.min(78, maximumPower),
+      projectileType: "stone",
+    };
+    const values = { ...(best?.values ?? fallback) };
+    const variation = (state.turnNumber % 3) - 1;
+
+    if (difficulty === "easy") {
+      values.angleDeg += variation * 8;
+      values.power += state.turnNumber % 2 === 0 ? 8 : -12;
+    } else if (difficulty === "normal") {
+      values.angleDeg += variation * 2;
+      values.power += variation * 2;
+    }
+
+    values.angleDeg = Phaser.Math.Clamp(
+      Math.round(values.angleDeg),
+      GAME_CONFIG.aiming.minAngleDeg,
+      GAME_CONFIG.aiming.maxAngleDeg,
+    );
+    values.power = Phaser.Math.Clamp(
+      Math.round(values.power),
+      GAME_CONFIG.aiming.minPower,
+      maximumPower,
+    );
+    return values;
   }
 
   private showDamage(targetId: PlayerId, damage: number): void {

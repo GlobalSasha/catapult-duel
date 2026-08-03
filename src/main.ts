@@ -1,9 +1,10 @@
 import * as Phaser from "phaser";
 
-import { GAME_HEIGHT, GAME_WIDTH } from "./game/gameDimensions";
+import { RENDER_HEIGHT, RENDER_WIDTH } from "./game/gameDimensions";
 import { STRINGS_RU } from "./game/i18n/strings.ru";
 import { BattleScene } from "./game/scenes/BattleScene";
 import { BootScene } from "./game/scenes/BootScene";
+import { HomeScene } from "./game/scenes/HomeScene";
 import { MenuScene } from "./game/scenes/MenuScene";
 import { PlacementScene } from "./game/scenes/PlacementScene";
 import { ResultScene } from "./game/scenes/ResultScene";
@@ -24,11 +25,12 @@ if (rotateMessage) {
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
   parent: "game",
-  width: GAME_WIDTH,
-  height: GAME_HEIGHT,
+  width: RENDER_WIDTH,
+  height: RENDER_HEIGHT,
   backgroundColor: "#161a24",
   scene: [
     BootScene,
+    HomeScene,
     MenuScene,
     PlacementScene,
     BattleScene,
@@ -37,8 +39,8 @@ const config: Phaser.Types.Core.GameConfig = {
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
-    width: GAME_WIDTH,
-    height: GAME_HEIGHT,
+    width: RENDER_WIDTH,
+    height: RENDER_HEIGHT,
   },
 };
 

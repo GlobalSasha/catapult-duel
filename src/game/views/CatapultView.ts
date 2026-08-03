@@ -66,6 +66,7 @@ export class CatapultView extends Phaser.GameObjects.Container {
     scene: Phaser.Scene,
     player: PlayerState,
     isActive: boolean,
+    displayName?: string,
   ) {
     super(scene, player.catapultX, player.catapultY);
     scene.add.existing(this);
@@ -150,7 +151,8 @@ export class CatapultView extends Phaser.GameObjects.Container {
       scene,
       0,
       -186,
-      STRINGS_RU.playerName(playerNumber),
+      displayName?.toLocaleUpperCase("ru-RU") ??
+        STRINGS_RU.playerName(playerNumber),
       {
         color: player.id === "left" ? "#9ec5ff" : "#ffb29b",
         fontFamily: "Arial, sans-serif",

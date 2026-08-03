@@ -93,20 +93,20 @@ function playAutonomousMatch(
   };
 }
 
-describe("ten complete autonomous balance matches", () => {
-  it("finishes ten matches across both arenas without stuck phases", () => {
-    const summaries = Array.from({ length: 10 }, (_, matchIndex) =>
+describe("twelve complete autonomous balance matches", () => {
+  it("finishes one match on every arena without stuck phases", () => {
+    const summaries = Array.from({ length: ARENAS.length }, (_, matchIndex) =>
       playAutonomousMatch(
         matchIndex,
         matchIndex % 2 === 0 ? "left" : "right",
       ),
     );
 
-    expect(summaries).toHaveLength(10);
-    expect(summaries.filter(({ winnerId }) => winnerId === "left")).toHaveLength(5);
-    expect(summaries.filter(({ winnerId }) => winnerId === "right")).toHaveLength(5);
+    expect(summaries).toHaveLength(ARENAS.length);
+    expect(summaries.filter(({ winnerId }) => winnerId === "left")).toHaveLength(6);
+    expect(summaries.filter(({ winnerId }) => winnerId === "right")).toHaveLength(6);
     expect(new Set(summaries.map(({ arenaId }) => arenaId))).toEqual(
-      new Set(["highlands", "canyon"]),
+      new Set(ARENAS.map(({ id }) => id)),
     );
   });
 });

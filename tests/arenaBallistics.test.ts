@@ -39,11 +39,13 @@ describe("arena ballistic variety", () => {
         const successfulAngles = [...new Set(hits.map(({ angle }) => angle))];
         const successfulPowers = [...new Set(hits.map(({ power }) => power))];
 
-        expect(hits.length).toBeGreaterThanOrEqual(30);
-        expect(Math.min(...successfulAngles)).toBeLessThanOrEqual(20);
-        expect(Math.max(...successfulAngles)).toBeGreaterThanOrEqual(60);
-        expect(successfulAngles.length).toBeGreaterThanOrEqual(20);
-        expect(successfulPowers.length).toBeGreaterThanOrEqual(10);
+        const label = `${arena.id}:${playerId}`;
+
+        expect(hits.length, label).toBeGreaterThanOrEqual(30);
+        expect(Math.min(...successfulAngles), label).toBeLessThanOrEqual(20);
+        expect(Math.max(...successfulAngles), label).toBeGreaterThanOrEqual(60);
+        expect(successfulAngles.length, label).toBeGreaterThanOrEqual(20);
+        expect(successfulPowers.length, label).toBeGreaterThanOrEqual(10);
       }
     }
   });

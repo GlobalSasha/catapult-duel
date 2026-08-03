@@ -13,6 +13,12 @@ import {
 } from "../src/game/core/simulateShot";
 
 describe("large arenas", () => {
+  it("ships twelve authored worlds with distinct identities", () => {
+    expect(ARENAS).toHaveLength(12);
+    expect(new Set(ARENAS.map(({ textureKey }) => textureKey)).size).toBe(12);
+    expect(new Set(ARENAS.map(({ timeLabel }) => timeLabel)).size).toBeGreaterThanOrEqual(10);
+    expect(ARENAS.every(({ terrain }) => terrain.length >= 19)).toBe(true);
+  });
   it("keeps opposing catapults outside one viewport", () => {
     expect(GAME_CONFIG.world.width).toBe(
       GAME_CONFIG.viewport.width * 3.375,

@@ -3,6 +3,7 @@ import type {
   ProjectileType,
 } from "../core/projectileCatalog";
 import type { WeatherId } from "../core/weather";
+import type { AiDifficulty } from "../core/matchSession";
 
 const PROJECTILE_NAMES: Record<ProjectileType, string> = {
   stone: "КАМЕНЬ",
@@ -41,7 +42,7 @@ export const STRINGS_RU = {
   menuSubtitle:
     "Выберите поле боя, рассчитайте траекторию и разрушьте катапульту соперника",
   chooseArenaTitle: "ВЫБЕРИТЕ АРЕНУ",
-  chooseArenaHint: "Нажмите на карточку · стрелки ← → тоже работают",
+  chooseArenaHint: "12 миров · нажмите на карточку или используйте стрелки",
   arenaHighlandsName: "СУМЕРЕЧНЫЕ ВЫСОТЫ",
   arenaHighlandsDescription: "Крепости над холодной горной долиной",
   arenaCanyonName: "БАГРОВЫЙ КАНЬОН",
@@ -52,6 +53,8 @@ export const STRINGS_RU = {
   placementEyebrow: "ПОДГОТОВКА К БОЮ",
   placementTitle: (playerNumber: number) =>
     `РАССТАНОВКА · ИГРОК ${playerNumber}`,
+  placementTitleForName: (playerName: string) =>
+    `РАССТАНОВКА · ${playerName.toLocaleUpperCase("ru-RU")}`,
   placementFieldHint:
     "Расставляйте катапульту и защиту прямо на своей части поля",
   placementCatapultFieldLabel: "ВЫБЕРИТЕ ПОЗИЦИЮ НА ПОЛЕ",
@@ -81,6 +84,10 @@ export const STRINGS_RU = {
   rotateDeviceTitle: "Поверните устройство",
   rotateDeviceMessage: "Для игры нужен горизонтальный экран",
   playerName: (playerNumber: number) => `ИГРОК ${playerNumber}`,
+  aiDifficultyName: (difficulty: AiDifficulty) =>
+    ({ easy: "ЛЕГКО", normal: "НОРМАЛЬНО", hard: "СЛОЖНО" })[
+      difficulty
+    ],
   health: (health: number) => `ЗДОРОВЬЕ ${health}`,
   activePlayer: "АКТИВЕН",
   angleLabel: (angle: number) => `УГОЛ ${angle}°`,
@@ -104,6 +111,10 @@ export const STRINGS_RU = {
   controlsArsenal: "АРСЕНАЛ · НАВЕДЕНИЕ · ЗАПУСК",
   aimingStatus: (turnNumber: number, playerNumber: number) =>
     `Ход ${turnNumber} · настройте угол и силу · активен Игрок ${playerNumber}`,
+  aimingStatusForName: (turnNumber: number, playerName: string) =>
+    `Ход ${turnNumber} · настройте угол и силу · активен ${playerName}`,
+  aiThinkingStatus: (difficulty: string) =>
+    `AI рассчитывает выстрел · сложность: ${difficulty}`,
   projectileFlightStatus: "Снаряд в полёте · управление заблокировано",
   fireUnavailableStatus: "Сейчас выстрел недоступен",
   frozenPowerUnavailableStatus: "Катапульта заморожена · максимум силы 70",
@@ -132,6 +143,8 @@ export const STRINGS_RU = {
   victoryIcon: "★",
   victoryTitle: "ПОБЕДА",
   victoryPlayer: (playerNumber: number) => `ИГРОК ${playerNumber} ПОБЕДИЛ`,
+  victoryPlayerName: (playerName: string) =>
+    `${playerName.toLocaleUpperCase("ru-RU")} ПОБЕДИЛ`,
   matchSummary: (turnNumber: number) =>
     `Матч завершён за ${turnNumber} ходов`,
   rematchButton: "РЕВАНШ",

@@ -27,6 +27,18 @@ import {
 } from "../core/protection";
 import { GAME_HEIGHT, GAME_WIDTH } from "../gameDimensions";
 import { STRINGS_RU } from "../i18n/strings.ru";
+import {
+  MATCH_SETTINGS_REGISTRY_KEY,
+  createAiPlacement,
+  readMatchSettings,
+  type MatchSettings,
+} from "../core/matchSession";
+import {
+  center2KCameraOn,
+  configure2KCamera,
+  set2KCameraBounds,
+  sharpenSceneText,
+} from "../rendering";
 import { CatapultView } from "../views/CatapultView";
 import { createCastleAmbientEffects } from "../views/CastleAmbientEffects";
 import {
@@ -63,6 +75,7 @@ export class PlacementScene extends Phaser.Scene {
   private arenaId: ArenaId = DEFAULT_ARENA_ID;
   private currentPlayerId: PlayerId = "left";
   private draft: MatchPlacement = createDefaultMatchPlacement();
+  private matchSettings: MatchSettings = readMatchSettings(undefined);
   private selectedTool: PlacementTool = "wood";
   private dynamicObjects: Phaser.GameObjects.GameObject[] = [];
   private statusMessage: string = STRINGS_RU.placementRecommended;
@@ -75,6 +88,10 @@ export class PlacementScene extends Phaser.Scene {
   }
 
   create(data: PlacementSceneData): void {
+    configure2KCamera(this);
+    this.matchSettings = readMatchSettings(
+      this.registry.get(MATCH_SETTINGS_REGISTRY_KEY),
+    );
     this.arenaId = isArenaId(data.arenaId)
       ? data.arenaId
       : DEFAULT_ARENA_ID;
@@ -84,6 +101,7 @@ export class PlacementScene extends Phaser.Scene {
     this.statusMessage = STRINGS_RU.placementRecommended;
     this.drawBackdrop();
     this.drawPlayerSetup();
+    sharpenSceneText(this);
     this.input.keyboard?.on("keydown", this.handleKeyDown, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.input.keyboard?.off("keydown", this.handleKeyDown, this);
@@ -93,7 +111,8 @@ export class PlacementScene extends Phaser.Scene {
   private drawBackdrop(): void {
     const arena = getArenaDefinition(this.arenaId);
 
-    this.cameras.main.setBounds(
+    set2KCameraBounds(
+      this,
       0,
       0,
       GAME_CONFIG.world.width,
@@ -213,7 +232,6 @@ export class PlacementScene extends Phaser.Scene {
 
   private drawPlayerSetup(): void {
     this.clearDynamicObjects();
-    const playerNumber = this.currentPlayerId === "left" ? 1 : 2;
     const placement = this.draft[this.currentPlayerId];
     const validation = validatePlayerPlacement(placement);
     const arena = getArenaDefinition(this.arenaId);
@@ -230,7 +248,7 @@ export class PlacementScene extends Phaser.Scene {
         ? GAME_CONFIG.placement.catapultSlots.left[1]
         : GAME_CONFIG.placement.catapultSlots.right[1];
 
-    this.cameras.main.centerOn(baseCenterX, GAME_HEIGHT / 2);
+    center2KCameraOn(this, baseCenterX, GAME_HEIGHT / 2);
 
     this.trackUi(
       this.add
@@ -245,13 +263,20 @@ export class PlacementScene extends Phaser.Scene {
     );
     this.trackUi(
       this.add
-        .text(70, 78, STRINGS_RU.placementTitle(playerNumber), {
+        .text(
+          70,
+          78,
+          STRINGS_RU.placementTitleForName(
+            this.matchSettings.playerNames[this.currentPlayerId],
+          ),
+          {
           color: COLORS.text,
           fontFamily: "Arial, sans-serif",
           fontSize: "31px",
           fontStyle: "bold",
           letterSpacing: 3,
-        })
+          },
+        )
         .setOrigin(0, 0.5),
     );
     this.trackUi(
@@ -856,6 +881,17 @@ export class PlacementScene extends Phaser.Scene {
 
   private confirmCurrentPlayer(): void {
     if (this.currentPlayerId === "left") {
+      if (this.matchSettings.mode === "ai") {
+        this.draft.right = createAiPlacement(
+          this.matchSettings.aiDifficulty,
+        );
+        this.scene.start("BattleScene", {
+          arenaId: this.arenaId,
+          placement: cloneMatchPlacement(this.draft),
+        });
+        return;
+      }
+
       this.showHandoff();
       return;
     }

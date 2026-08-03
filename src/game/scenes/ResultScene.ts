@@ -8,6 +8,13 @@ import {
 } from "../arena/arenaCatalog";
 import type { PlayerId } from "../core/battleTypes";
 import {
+  MATCH_SETTINGS_REGISTRY_KEY,
+  getRatingForPlayer,
+  readMatchSettings,
+  recordMatchResult,
+  type MatchSettings,
+} from "../core/matchSession";
+import {
   cloneMatchPlacement,
   createDefaultMatchPlacement,
   isMatchPlacement,
@@ -15,6 +22,7 @@ import {
 } from "../core/placement";
 import { GAME_HEIGHT, GAME_WIDTH } from "../gameDimensions";
 import { STRINGS_RU } from "../i18n/strings.ru";
+import { configure2KCamera, sharpenSceneText } from "../rendering";
 
 interface ResultSceneData {
   winnerId: PlayerId;
@@ -39,12 +47,17 @@ export class ResultScene extends Phaser.Scene {
   private navigationStarted = false;
   private arenaId: ArenaId = DEFAULT_ARENA_ID;
   private matchPlacement: MatchPlacement = createDefaultMatchPlacement();
+  private matchSettings: MatchSettings = readMatchSettings(undefined);
 
   constructor() {
     super("ResultScene");
   }
 
   create(data: ResultSceneData): void {
+    configure2KCamera(this);
+    this.matchSettings = readMatchSettings(
+      this.registry.get(MATCH_SETTINGS_REGISTRY_KEY),
+    );
     this.navigationStarted = false;
     this.arenaId = isArenaId(data.arenaId)
       ? data.arenaId
@@ -52,8 +65,13 @@ export class ResultScene extends Phaser.Scene {
     this.matchPlacement = isMatchPlacement(data.placement)
       ? cloneMatchPlacement(data.placement)
       : createDefaultMatchPlacement();
+    recordMatchResult(this.matchSettings, data.winnerId);
+    const playerRating = getRatingForPlayer(
+      this.matchSettings.playerNames.left,
+    );
     this.drawBackdrop();
-    this.drawResultCard(data);
+    this.drawResultCard(data, playerRating.rating);
+    sharpenSceneText(this);
 
     this.input.keyboard?.on("keydown", this.handleKeyDown, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -75,8 +93,8 @@ export class ResultScene extends Phaser.Scene {
       .setBlendMode(Phaser.BlendModes.ADD);
   }
 
-  private drawResultCard(data: ResultSceneData): void {
-    const playerNumber = data.winnerId === "left" ? 1 : 2;
+  private drawResultCard(data: ResultSceneData, playerRating: number): void {
+    const winnerName = this.matchSettings.playerNames[data.winnerId];
     const panel = this.add.graphics();
 
     panel.fillStyle(COLORS.panel, 0.97);
@@ -107,12 +125,27 @@ export class ResultScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.add
-      .text(800, 455, STRINGS_RU.victoryPlayer(playerNumber), {
+      .text(800, 455, STRINGS_RU.victoryPlayerName(winnerName), {
         color: COLORS.primaryText,
         fontFamily: "Arial, sans-serif",
         fontSize: "36px",
         fontStyle: "bold",
       })
+      .setOrigin(0.5);
+
+    this.add
+      .text(
+        800,
+        548,
+        `${this.matchSettings.playerNames.left} · РЕЙТИНГ ${playerRating}`,
+        {
+          color: "#ffd166",
+          fontFamily: "Arial, sans-serif",
+          fontSize: "15px",
+          fontStyle: "bold",
+          letterSpacing: 1,
+        },
+      )
       .setOrigin(0.5);
 
     this.add

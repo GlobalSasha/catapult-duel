@@ -4,15 +4,22 @@ import {
   ARENAS,
   DEFAULT_ARENA_ID,
   getArenaDefinition,
+  type ArenaDefinition,
   type ArenaId,
 } from "../arena/arenaCatalog";
 import { GAME_HEIGHT, GAME_WIDTH } from "../gameDimensions";
 import { STRINGS_RU } from "../i18n/strings.ru";
+import {
+  MATCH_SETTINGS_REGISTRY_KEY,
+  readMatchSettings,
+  type MatchSettings,
+} from "../core/matchSession";
+import { configure2KCamera, sharpenSceneText } from "../rendering";
 
 const COLORS = {
   navy: 0x0b1220,
   panel: 0x101927,
-  panelStroke: 0x7f99bd,
+  panelStroke: 0x7188a9,
   amber: 0xffd166,
   mint: 0x7ee2a8,
   primaryText: "#f7f4ec",
@@ -30,12 +37,17 @@ export class MenuScene extends Phaser.Scene {
   private background!: Phaser.GameObjects.Image;
   private readonly cards = new Map<ArenaId, ArenaCard>();
   private battleStarted = false;
+  private matchSettings: MatchSettings = readMatchSettings(undefined);
 
   constructor() {
     super("MenuScene");
   }
 
   create(): void {
+    configure2KCamera(this);
+    this.matchSettings = readMatchSettings(
+      this.registry.get(MATCH_SETTINGS_REGISTRY_KEY),
+    );
     this.selectedArenaId = DEFAULT_ARENA_ID;
     this.battleStarted = false;
     this.cards.clear();
@@ -44,19 +56,21 @@ export class MenuScene extends Phaser.Scene {
       .image(0, 0, getArenaDefinition(this.selectedArenaId).textureKey)
       .setOrigin(0)
       .setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
-      .setTint(0x738099);
+      .setTint(0x6b7890);
 
     this.add
-      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, COLORS.navy, 0.52)
+      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, COLORS.navy, 0.5)
       .setOrigin(0);
     this.add
-      .rectangle(0, 0, GAME_WIDTH, 255, COLORS.navy, 0.68)
+      .rectangle(0, 0, GAME_WIDTH, 172, COLORS.navy, 0.8)
       .setOrigin(0);
 
     this.drawHeader();
+    this.drawNavigation();
     this.drawArenaCards();
     this.drawStartButton();
     this.refreshSelection();
+    sharpenSceneText(this);
 
     this.input.keyboard?.on("keydown", this.handleKeyDown, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -66,167 +80,203 @@ export class MenuScene extends Phaser.Scene {
 
   private drawHeader(): void {
     this.add
-      .text(GAME_WIDTH / 2, 52, STRINGS_RU.menuEyebrow, {
+      .text(GAME_WIDTH / 2, 18, STRINGS_RU.menuEyebrow, {
         color: "#ffd166",
         fontFamily: "Arial, sans-serif",
-        fontSize: "16px",
+        fontSize: "12px",
+        fontStyle: "bold",
+        letterSpacing: 4,
+      })
+      .setOrigin(0.5, 0);
+
+    this.add
+      .text(GAME_WIDTH / 2, 42, STRINGS_RU.gameTitle, {
+        color: COLORS.primaryText,
+        fontFamily: "Arial, sans-serif",
+        fontSize: "38px",
         fontStyle: "bold",
         letterSpacing: 5,
-      })
-      .setOrigin(0.5, 0);
-
-    this.add
-      .text(GAME_WIDTH / 2, 86, STRINGS_RU.gameTitle, {
-        color: COLORS.primaryText,
-        fontFamily: "Arial, sans-serif",
-        fontSize: "58px",
-        fontStyle: "bold",
-        letterSpacing: 6,
         stroke: "#0b1220",
-        strokeThickness: 8,
+        strokeThickness: 6,
       })
       .setOrigin(0.5, 0);
 
     this.add
-      .text(GAME_WIDTH / 2, 162, STRINGS_RU.menuSubtitle, {
-        color: COLORS.secondaryText,
-        fontFamily: "Arial, sans-serif",
-        fontSize: "19px",
-        align: "center",
-      })
-      .setOrigin(0.5, 0);
-
-    this.add
-      .text(GAME_WIDTH / 2, 222, STRINGS_RU.chooseArenaTitle, {
+      .text(GAME_WIDTH / 2, 92, STRINGS_RU.chooseArenaTitle, {
         color: COLORS.primaryText,
         fontFamily: "Arial, sans-serif",
-        fontSize: "24px",
+        fontSize: "18px",
         fontStyle: "bold",
         letterSpacing: 3,
       })
       .setOrigin(0.5, 0);
 
     this.add
-      .text(GAME_WIDTH / 2, 257, STRINGS_RU.chooseArenaHint, {
+      .text(GAME_WIDTH / 2, 124, STRINGS_RU.chooseArenaHint, {
         color: COLORS.secondaryText,
         fontFamily: "Arial, sans-serif",
-        fontSize: "15px",
+        fontSize: "13px",
+      })
+      .setOrigin(0.5, 0);
+
+    this.add
+      .text(GAME_WIDTH / 2, 151, "ДЕНЬ · ЗАКАТ · СУМЕРКИ · НОЧЬ · 12 РАЗНЫХ РЕЛЬЕФОВ", {
+        color: "#f0d18b",
+        fontFamily: "Arial, sans-serif",
+        fontSize: "10px",
+        fontStyle: "bold",
+        letterSpacing: 2,
       })
       .setOrigin(0.5, 0);
   }
 
+  private drawNavigation(): void {
+    const back = this.add
+      .rectangle(92, 74, 134, 44, COLORS.panel, 0.96)
+      .setStrokeStyle(2, COLORS.panelStroke, 0.75)
+      .setInteractive({ useHandCursor: true });
+    this.add
+      .text(92, 74, "←  МЕНЮ", {
+        color: COLORS.primaryText,
+        fontFamily: "Arial, sans-serif",
+        fontSize: "11px",
+        fontStyle: "bold",
+        letterSpacing: 1,
+      })
+      .setOrigin(0.5);
+    const modeLabel =
+      this.matchSettings.mode === "ai"
+        ? `ПРОТИВ AI · ${STRINGS_RU.aiDifficultyName(this.matchSettings.aiDifficulty)}`
+        : "ДВА ИГРОКА";
+    this.add
+      .text(1510, 61, `${this.matchSettings.playerNames.left}\n${modeLabel}`, {
+        color: "#d8e4f2",
+        fontFamily: "Arial, sans-serif",
+        fontSize: "11px",
+        fontStyle: "bold",
+        align: "right",
+        lineSpacing: 5,
+      })
+      .setOrigin(1, 0);
+    back.on("pointerdown", () => this.scene.start("HomeScene"));
+  }
+
   private drawArenaCards(): void {
     ARENAS.forEach((arena, index) => {
-      const x = index === 0 ? 450 : 1150;
-      const y = 480;
-
-      this.add
-        .rectangle(x + 10, y + 14, 578, 354, 0x000000, 0.38)
-        .setOrigin(0.5);
-
-      const border = this.add
-        .rectangle(x, y, 578, 354, COLORS.panel, 0.98)
-        .setStrokeStyle(3, COLORS.panelStroke, 0.72)
-        .setInteractive({ useHandCursor: true });
-
-      this.add
-        .image(x, y - 44, arena.textureKey)
-        .setDisplaySize(558, 250)
-        .setCrop(0, 35, 1672, 780);
-
-      this.add
-        .rectangle(x, y + 119, 558, 96, COLORS.panel, 0.98)
-        .setOrigin(0.5);
-
-      this.add
-        .text(x - 252, y + 91, this.getArenaName(arena.id), {
-          color: arena.accentTextColor,
-          fontFamily: "Arial, sans-serif",
-          fontSize: "20px",
-          fontStyle: "bold",
-          letterSpacing: 1,
-        })
-        .setOrigin(0, 0.5);
-
-      this.add
-        .text(x - 252, y + 126, this.getArenaDescription(arena.id), {
-          color: COLORS.secondaryText,
-          fontFamily: "Arial, sans-serif",
-          fontSize: "15px",
-        })
-        .setOrigin(0, 0.5);
-
-      const badgeBackground = this.add
-        .rectangle(0, 0, 120, 34, COLORS.amber, 1)
-        .setStrokeStyle(2, 0xffe7a6, 0.9);
-      const badgeText = this.add
-        .text(0, 0, STRINGS_RU.selectedArena, {
-          color: "#2a2517",
-          fontFamily: "Arial, sans-serif",
-          fontSize: "13px",
-          fontStyle: "bold",
-          letterSpacing: 1,
-        })
-        .setOrigin(0.5);
-      const badge = this.add.container(x + 208, y - 144, [
-        badgeBackground,
-        badgeText,
-      ]);
-
-      border.on("pointerdown", () => {
-        this.selectArena(arena.id);
-      });
-      border.on("pointerover", () => {
-        if (arena.id !== this.selectedArenaId) {
-          border.setStrokeStyle(4, arena.accentColor, 0.9);
-        }
-      });
-      border.on("pointerout", () => {
-        this.refreshSelection();
-      });
-
-      this.cards.set(arena.id, { border, badge });
+      this.drawArenaCard(arena, index);
     });
+  }
+
+  private drawArenaCard(arena: ArenaDefinition, index: number): void {
+    const column = index % 4;
+    const row = Math.floor(index / 4);
+    const x = 236 + column * 376;
+    const y = 267 + row * 190;
+
+    this.add
+      .rectangle(x + 6, y + 8, 344, 174, 0x000000, 0.42)
+      .setOrigin(0.5);
+
+    const border = this.add
+      .rectangle(x, y, 344, 174, COLORS.panel, 0.98)
+      .setStrokeStyle(2, COLORS.panelStroke, 0.7)
+      .setInteractive({ useHandCursor: true });
+
+    this.add
+      .image(x, y - 27, arena.textureKey)
+      .setDisplaySize(332, 112);
+
+    this.add
+      .rectangle(x, y + 49, 332, 56, COLORS.panel, 0.97)
+      .setOrigin(0.5);
+
+    this.add
+      .text(x - 154, y + 28, arena.displayName, {
+        color: arena.accentTextColor,
+        fontFamily: "Arial, sans-serif",
+        fontSize: "12px",
+        fontStyle: "bold",
+        letterSpacing: 0.6,
+      })
+      .setOrigin(0, 0.5);
+
+    this.add
+      .text(x - 154, y + 50, arena.description, {
+        color: COLORS.secondaryText,
+        fontFamily: "Arial, sans-serif",
+        fontSize: "9px",
+      })
+      .setOrigin(0, 0.5);
+
+    const timeBackground = this.add
+      .rectangle(0, 0, 126, 22, 0x111723, 0.9)
+      .setStrokeStyle(1, arena.accentColor, 0.85);
+    const timeText = this.add
+      .text(0, 0, arena.timeLabel, {
+        color: arena.accentTextColor,
+        fontFamily: "Arial, sans-serif",
+        fontSize: "8px",
+        fontStyle: "bold",
+        letterSpacing: 0.7,
+      })
+      .setOrigin(0.5);
+    this.add.container(x + 101, y - 72, [timeBackground, timeText]);
+
+    const badgeBackground = this.add
+      .rectangle(0, 0, 92, 23, COLORS.amber, 1)
+      .setStrokeStyle(1, 0xffe7a6, 0.9);
+    const badgeText = this.add
+      .text(0, 0, STRINGS_RU.selectedArena, {
+        color: "#2a2517",
+        fontFamily: "Arial, sans-serif",
+        fontSize: "8px",
+        fontStyle: "bold",
+        letterSpacing: 0.6,
+      })
+      .setOrigin(0.5);
+    const badge = this.add.container(x - 119, y - 72, [
+      badgeBackground,
+      badgeText,
+    ]);
+
+    border.on("pointerdown", () => {
+      this.selectArena(arena.id);
+    });
+    border.on("pointerover", () => {
+      if (arena.id !== this.selectedArenaId) {
+        border.setStrokeStyle(4, arena.accentColor, 0.9);
+      }
+    });
+    border.on("pointerout", () => {
+      this.refreshSelection();
+    });
+
+    this.cards.set(arena.id, { border, badge });
   }
 
   private drawStartButton(): void {
     const shadow = this.add.rectangle(
-      GAME_WIDTH / 2 + 8,
-      781,
-      340,
-      72,
+      GAME_WIDTH / 2 + 6,
+      845,
+      326,
+      52,
       0x000000,
-      0.38,
+      0.42,
     );
     const button = this.add
-      .rectangle(GAME_WIDTH / 2, 773, 340, 72, COLORS.mint, 1)
-      .setStrokeStyle(3, 0xd4ffe6, 0.9);
+      .rectangle(GAME_WIDTH / 2, 839, 326, 52, COLORS.mint, 1)
+      .setStrokeStyle(2, 0xd4ffe6, 0.9);
     const hitZone = this.add
-      .rectangle(
-        GAME_WIDTH / 2,
-        773,
-        372,
-        112,
-        0xffffff,
-        0.001,
-      )
+      .rectangle(GAME_WIDTH / 2, 839, 356, 72, 0xffffff, 0.001)
       .setInteractive({ useHandCursor: true });
 
     this.add
-      .text(GAME_WIDTH / 2, 773, STRINGS_RU.startBattleButton, {
+      .text(GAME_WIDTH / 2, 839, STRINGS_RU.startBattleButton, {
         color: COLORS.buttonText,
         fontFamily: "Arial, sans-serif",
-        fontSize: "21px",
+        fontSize: "16px",
         fontStyle: "bold",
-        letterSpacing: 2,
-      })
-      .setOrigin(0.5);
-
-    this.add
-      .text(GAME_WIDTH / 2, 829, STRINGS_RU.startBattleHint, {
-        color: COLORS.secondaryText,
-        fontFamily: "Arial, sans-serif",
-        fontSize: "14px",
+        letterSpacing: 1.5,
       })
       .setOrigin(0.5);
 
@@ -246,19 +296,47 @@ export class MenuScene extends Phaser.Scene {
       return;
     }
 
+    if (event.code === "Escape") {
+      this.scene.start("HomeScene");
+      return;
+    }
+
     if (event.code === "ArrowLeft") {
-      this.selectArena("highlands");
+      this.selectRelative(-1);
       return;
     }
 
     if (event.code === "ArrowRight") {
-      this.selectArena("canyon");
+      this.selectRelative(1);
+      return;
+    }
+
+    if (event.code === "ArrowUp") {
+      this.selectRelative(-4);
+      return;
+    }
+
+    if (event.code === "ArrowDown") {
+      this.selectRelative(4);
       return;
     }
 
     if (event.code === "Enter" || event.code === "Space") {
       event.preventDefault();
       this.startBattle();
+    }
+  }
+
+  private selectRelative(offset: number): void {
+    const currentIndex = ARENAS.findIndex(
+      ({ id }) => id === this.selectedArenaId,
+    );
+    const nextIndex =
+      (currentIndex + offset + ARENAS.length) % ARENAS.length;
+    const nextArena = ARENAS[nextIndex];
+
+    if (nextArena) {
+      this.selectArena(nextArena.id);
     }
   }
 
@@ -280,9 +358,9 @@ export class MenuScene extends Phaser.Scene {
       const cardArena = getArenaDefinition(id);
 
       card.border.setStrokeStyle(
-        selected ? 6 : 3,
+        selected ? 5 : 2,
         selected ? cardArena.accentColor : COLORS.panelStroke,
-        selected ? 1 : 0.72,
+        selected ? 1 : 0.7,
       );
       card.badge.setVisible(selected);
     });
@@ -303,17 +381,5 @@ export class MenuScene extends Phaser.Scene {
         });
       },
     );
-  }
-
-  private getArenaName(id: ArenaId): string {
-    return id === "highlands"
-      ? STRINGS_RU.arenaHighlandsName
-      : STRINGS_RU.arenaCanyonName;
-  }
-
-  private getArenaDescription(id: ArenaId): string {
-    return id === "highlands"
-      ? STRINGS_RU.arenaHighlandsDescription
-      : STRINGS_RU.arenaCanyonDescription;
   }
 }
