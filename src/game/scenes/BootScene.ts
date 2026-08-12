@@ -37,38 +37,38 @@ export class BootScene extends Phaser.Scene {
     this.load.image("arena-moon", "assets/arena-moon.webp");
     this.load.image("arena-toxic", "assets/arena-toxic.webp");
     this.load.image("arena-storm", "assets/arena-storm.webp");
-    this.load.image("catapult-left", "assets/catapult-left.png");
-    this.load.image("catapult-right", "assets/catapult-right.png");
-    this.load.image("catapult-left-body", "assets/catapult-left-body.png");
-    this.load.image("catapult-left-arm", "assets/catapult-left-arm.png");
-    this.load.image("catapult-left-wheel", "assets/catapult-left-wheel.png");
-    this.load.image("catapult-right-body", "assets/catapult-right-body.png");
-    this.load.image("catapult-right-arm", "assets/catapult-right-arm.png");
-    this.load.image("catapult-right-wheel", "assets/catapult-right-wheel.png");
-    this.load.image("castle-tower", "assets/castle-tower.png");
+    this.load.image("catapult-left", "assets/catapult-left.webp");
+    this.load.image("catapult-right", "assets/catapult-right.webp");
+    this.load.image("catapult-left-body", "assets/catapult-left-body.webp");
+    this.load.image("catapult-left-arm", "assets/catapult-left-arm.webp");
+    this.load.image("catapult-left-wheel", "assets/catapult-left-wheel.webp");
+    this.load.image("catapult-right-body", "assets/catapult-right-body.webp");
+    this.load.image("catapult-right-arm", "assets/catapult-right-arm.webp");
+    this.load.image("catapult-right-wheel", "assets/catapult-right-wheel.webp");
+    this.load.image("castle-tower", "assets/castle-tower.webp");
     this.load.image(
       "map-highlands-watchtower",
-      "assets/map-elements/highlands-watchtower.png",
+      "assets/map-elements/highlands-watchtower.webp",
     );
     this.load.image(
       "map-highlands-ruined-gate",
-      "assets/map-elements/highlands-ruined-gate.png",
+      "assets/map-elements/highlands-ruined-gate.webp",
     );
     this.load.image(
       "map-moon-crashed-lander",
-      "assets/map-elements/moon-crashed-lander.png",
+      "assets/map-elements/moon-crashed-lander.webp",
     );
     this.load.image(
       "map-moon-drill-rig",
-      "assets/map-elements/moon-drill-rig.png",
+      "assets/map-elements/moon-drill-rig.webp",
     );
     this.load.image(
       "map-volcano-lava-pump",
-      "assets/map-elements/volcano-lava-pump.png",
+      "assets/map-elements/volcano-lava-pump.webp",
     );
     this.load.image(
       "map-volcano-collapsed-foundry",
-      "assets/map-elements/volcano-collapsed-foundry.png",
+      "assets/map-elements/volcano-collapsed-foundry.webp",
     );
     const arenaElementTextures = [
       ["map-canyon-broken-arch", "canyon-broken-arch"],
@@ -92,30 +92,30 @@ export class BootScene extends Phaser.Scene {
     ] as const;
 
     arenaElementTextures.forEach(([key, fileName]) => {
-      this.load.image(key, `assets/map-elements/${fileName}.png`);
+      this.load.image(key, `assets/map-elements/${fileName}.webp`);
     });
-    this.load.image("stone", "assets/stone.png");
+    this.load.image("stone", "assets/stone.webp");
     this.load.image(
       "projectile-stone-3d",
-      "assets/projectile-stone-3d.png",
+      "assets/projectile-stone-3d.webp",
     );
     this.load.image(
       "projectile-fire-3d",
-      "assets/projectile-fire-3d.png",
+      "assets/projectile-fire-3d.webp",
     );
     this.load.image(
       "projectile-ice-3d",
-      "assets/projectile-ice-3d.png",
+      "assets/projectile-ice-3d.webp",
     );
     this.load.image(
       "projectile-diamond-3d",
-      "assets/projectile-diamond-3d.png",
+      "assets/projectile-diamond-3d.webp",
     );
     this.load.image(
       "projectile-bomb-3d",
-      "assets/projectile-bomb-3d.png",
+      "assets/projectile-bomb-3d.webp",
     );
-    this.load.image("impact-burst", "assets/impact-burst.png");
+    this.load.image("impact-burst", "assets/impact-burst.webp");
   }
 
   create(): void {
