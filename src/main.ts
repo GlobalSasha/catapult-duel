@@ -16,6 +16,87 @@ const gameRoot = document.querySelector("#game");
 const rotateTitle = document.querySelector('[data-string="rotate-title"]');
 const rotateMessage = document.querySelector('[data-string="rotate-message"]');
 const musicToggle = document.querySelector<HTMLButtonElement>("#music-toggle");
+const fullscreenToggle = document.querySelector<HTMLButtonElement>(
+  "#fullscreen-toggle",
+);
+const fullscreenHint = document.querySelector<HTMLElement>("#fullscreen-hint");
+const fullscreenHintClose = document.querySelector<HTMLButtonElement>(
+  "#fullscreen-hint-close",
+);
+
+interface WebkitDocument extends Document {
+  webkitFullscreenElement?: Element | null;
+  webkitExitFullscreen?: () => Promise<void> | void;
+}
+
+interface WebkitElement extends HTMLElement {
+  webkitRequestFullscreen?: () => Promise<void> | void;
+}
+
+const webkitDocument = document as WebkitDocument;
+const fullscreenTarget = document.documentElement as WebkitElement;
+const isStandalone = (): boolean =>
+  window.matchMedia("(display-mode: standalone)").matches ||
+  ("standalone" in navigator &&
+    Boolean((navigator as Navigator & { standalone?: boolean }).standalone));
+const isFullscreen = (): boolean =>
+  Boolean(document.fullscreenElement ?? webkitDocument.webkitFullscreenElement) ||
+  isStandalone();
+
+const updateFullscreenButton = (): void => {
+  const active = isFullscreen();
+  fullscreenToggle?.classList.toggle("is-active", active);
+  fullscreenToggle?.setAttribute(
+    "aria-label",
+    active ? "Выйти из полноэкранного режима" : "Открыть игру на весь экран",
+  );
+  const label = fullscreenToggle?.querySelector("span:last-child");
+  if (label) {
+    label.textContent = active ? "ВЫЙТИ" : "ВЕСЬ ЭКРАН";
+  }
+};
+
+const tryLockLandscape = async (): Promise<void> => {
+  const orientation = screen.orientation as ScreenOrientation & {
+    lock?: (orientation: "landscape") => Promise<void>;
+  };
+  try {
+    await orientation.lock?.("landscape");
+  } catch {
+    // Orientation locking is optional and unsupported by iOS Safari tabs.
+  }
+};
+
+const toggleFullscreen = async (): Promise<void> => {
+  if (isStandalone()) {
+    return;
+  }
+
+  try {
+    if (document.fullscreenElement ?? webkitDocument.webkitFullscreenElement) {
+      if (document.exitFullscreen) {
+        await document.exitFullscreen();
+      } else {
+        await webkitDocument.webkitExitFullscreen?.();
+      }
+      return;
+    }
+
+    if (fullscreenTarget.requestFullscreen) {
+      await fullscreenTarget.requestFullscreen({ navigationUI: "hide" });
+      await tryLockLandscape();
+    } else if (fullscreenTarget.webkitRequestFullscreen) {
+      await fullscreenTarget.webkitRequestFullscreen();
+      await tryLockLandscape();
+    } else {
+      fullscreenHint?.classList.add("is-visible");
+    }
+  } catch {
+    fullscreenHint?.classList.add("is-visible");
+  } finally {
+    updateFullscreenButton();
+  }
+};
 
 gameRoot?.setAttribute("aria-label", STRINGS_RU.gameAriaLabel);
 if (rotateTitle) {
@@ -43,6 +124,16 @@ musicToggle?.addEventListener("click", (event) => {
   event.stopPropagation();
   void musicController.toggleMuted();
 });
+fullscreenToggle?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  void toggleFullscreen();
+});
+fullscreenHintClose?.addEventListener("click", () => {
+  fullscreenHint?.classList.remove("is-visible");
+});
+document.addEventListener("fullscreenchange", updateFullscreenButton);
+document.addEventListener("webkitfullscreenchange", updateFullscreenButton);
+updateFullscreenButton();
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
