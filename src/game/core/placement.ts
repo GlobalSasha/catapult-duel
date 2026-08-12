@@ -2,11 +2,7 @@ import type { PlayerId } from "./battleTypes";
 import { GAME_CONFIG } from "./gameConfig";
 import type { ProtectionType } from "./protection";
 
-const VALID_PROTECTION_TYPES: readonly ProtectionType[] = [
-  "wood",
-  "net",
-  "metal",
-];
+const VALID_PROTECTION_TYPES: readonly ProtectionType[] = ["castle"];
 
 export interface ProtectionPlacement {
   slotIndex: number;
@@ -31,24 +27,35 @@ export interface PlacementValidation {
     | "invalid-protection-type"
     | "duplicate-slot"
     | "too-many-protections"
-    | "too-many-metal"
     | "over-budget"
     | null;
 }
 
-export function createDefaultMatchPlacement(): MatchPlacement {
-  const createPlayer = (): PlayerPlacement => ({
-    catapultSlotIndex: 1,
-    protections: [
-      { slotIndex: 2, type: "wood" },
-      { slotIndex: 3, type: "net" },
-      { slotIndex: 4, type: "metal" },
-    ],
-  });
+export function createCastlePlayerPlacement(
+  playerId: PlayerId,
+  catapultSlotIndex: number,
+  enabled: boolean = true,
+): PlayerPlacement {
+  const centers =
+    GAME_CONFIG.placement.castleWallCenters[playerId][catapultSlotIndex] ??
+    GAME_CONFIG.placement.castleWallCenters[playerId][1];
 
   return {
-    left: createPlayer(),
-    right: createPlayer(),
+    catapultSlotIndex,
+    protections: enabled
+      ? centers.map((x, slotIndex) => ({
+          slotIndex,
+          type: "castle" as const,
+          x,
+        }))
+      : [],
+  };
+}
+
+export function createDefaultMatchPlacement(): MatchPlacement {
+  return {
+    left: createCastlePlayerPlacement("left", 1),
+    right: createCastlePlayerPlacement("right", 1),
   };
 }
 
@@ -145,13 +152,6 @@ export function validatePlayerPlacement(
     GAME_CONFIG.placement.maximumProtectionCount
   ) {
     return result(false, "too-many-protections");
-  }
-
-  if (
-    placement.protections.filter(({ type }) => type === "metal")
-      .length > GAME_CONFIG.placement.maximumMetalCount
-  ) {
-    return result(false, "too-many-metal");
   }
 
   if (spentBudget > GAME_CONFIG.placement.protectionBudget) {

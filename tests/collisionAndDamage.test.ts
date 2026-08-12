@@ -4,10 +4,12 @@ import { createInitialBattleState } from "../src/game/core/createInitialBattleSt
 import {
   applyShotDamage,
   calculateDirectDamage,
+  calculatePhysicalImpactDamage,
 } from "../src/game/core/damage";
 import { GAME_CONFIG } from "../src/game/core/gameConfig";
 import { simulateShot } from "../src/game/core/simulateShot";
 import type { FireCommand } from "../src/game/core/shotTypes";
+import { createDefaultMatchPlacement } from "../src/game/core/placement";
 
 function command(angleDeg: number, power: number): FireCommand {
   return {
@@ -19,15 +21,16 @@ function command(angleDeg: number, power: number): FireCommand {
 }
 
 function createUnprotectedState() {
-  const state = createInitialBattleState();
-  state.protections = [];
-  return state;
+  const placement = createDefaultMatchPlacement();
+  placement.left.protections = [];
+  placement.right.protections = [];
+  return createInitialBattleState(undefined, undefined, placement);
 }
 
 describe("collision and damage", () => {
   it("damages the target once on a direct hit", () => {
     const state = createUnprotectedState();
-    const shot = simulateShot(command(20, 90), state);
+    const shot = simulateShot(command(22, 87), state);
     const nextState = applyShotDamage(state, shot);
 
     expect(shot.endReason).toBe("impact");
@@ -102,5 +105,26 @@ describe("collision and damage", () => {
     };
 
     expect(applyShotDamage(state, lethalShot).players.right.health).toBe(0);
+  });
+
+  it("uses energy, projectile mass, incidence and hit zone", () => {
+    const glancingArmHit = calculatePhysicalImpactDamage({
+      baseDamage: 25,
+      impactSpeed: 1500,
+      relativeMass: 1,
+      normalImpactRatio: 0.2,
+      materialCoefficient: 1,
+      hitZone: "arm",
+    });
+    const directHeavyWheelHit = calculatePhysicalImpactDamage({
+      baseDamage: 25,
+      impactSpeed: 2400,
+      relativeMass: 1.2,
+      normalImpactRatio: 1,
+      materialCoefficient: 1,
+      hitZone: "wheels",
+    });
+
+    expect(directHeavyWheelHit).toBeGreaterThan(glancingArmHit);
   });
 });

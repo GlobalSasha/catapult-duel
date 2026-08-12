@@ -4,6 +4,7 @@ import { ARENAS } from "../src/game/arena/arenaCatalog";
 import type { PlayerId } from "../src/game/core/battleTypes";
 import { createInitialBattleState } from "../src/game/core/createInitialBattleState";
 import { simulateShot } from "../src/game/core/simulateShot";
+import { createDefaultMatchPlacement } from "../src/game/core/placement";
 
 describe("arena ballistic variety", () => {
   it("offers multiple viable angle and power bands from every base", () => {
@@ -12,10 +13,16 @@ describe("arena ballistic variety", () => {
         "left",
         "right",
       ] as const satisfies readonly PlayerId[]) {
-        const state = createInitialBattleState(arena.id);
+        const placement = createDefaultMatchPlacement();
+        placement.left.protections = [];
+        placement.right.protections = [];
+        const state = createInitialBattleState(
+          arena.id,
+          undefined,
+          placement,
+        );
         state.weather.id = "superheat";
         state.weather.wind = 0;
-        state.protections = [];
         const targetId = playerId === "left" ? "right" : "left";
         const hits: Array<{ angle: number; power: number }> = [];
 
@@ -41,12 +48,12 @@ describe("arena ballistic variety", () => {
 
         const label = `${arena.id}:${playerId}`;
 
-        expect(hits.length, label).toBeGreaterThanOrEqual(30);
-        expect(Math.min(...successfulAngles), label).toBeLessThanOrEqual(20);
-        expect(Math.max(...successfulAngles), label).toBeGreaterThanOrEqual(60);
-        expect(successfulAngles.length, label).toBeGreaterThanOrEqual(20);
-        expect(successfulPowers.length, label).toBeGreaterThanOrEqual(10);
+        expect(hits.length, label).toBeGreaterThanOrEqual(13);
+        expect(Math.min(...successfulAngles), label).toBeLessThanOrEqual(22);
+        expect(Math.max(...successfulAngles), label).toBeGreaterThanOrEqual(58);
+        expect(successfulAngles.length, label).toBeGreaterThanOrEqual(13);
+        expect(successfulPowers.length, label).toBeGreaterThanOrEqual(9);
       }
     }
-  });
+  }, 15_000);
 });

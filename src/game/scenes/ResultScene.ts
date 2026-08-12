@@ -23,6 +23,8 @@ import {
 import { GAME_HEIGHT, GAME_WIDTH } from "../gameDimensions";
 import { STRINGS_RU } from "../i18n/strings.ru";
 import { configure2KCamera, sharpenSceneText } from "../rendering";
+import { RETRO_UI } from "../ui/retroTheme";
+import { musicController } from "../audio/MusicController";
 
 interface ResultSceneData {
   winnerId: PlayerId;
@@ -32,16 +34,19 @@ interface ResultSceneData {
 }
 
 const COLORS = {
-  background: 0x08101c,
-  panel: 0x111a28,
-  panelStroke: 0x54729e,
-  amber: 0xffd166,
-  mint: 0x7ee2a8,
-  amberText: "#ffd166",
-  primaryText: "#f4f7ff",
-  secondaryText: "#9eb0cb",
-  buttonText: "#14221d",
+  background: RETRO_UI.colors.ink,
+  panel: RETRO_UI.colors.panel,
+  panelStroke: RETRO_UI.colors.border,
+  amber: RETRO_UI.colors.orange,
+  mint: RETRO_UI.colors.cyan,
+  amberText: RETRO_UI.text.orange,
+  primaryText: RETRO_UI.text.primary,
+  secondaryText: RETRO_UI.text.secondary,
+  buttonText: RETRO_UI.text.ink,
 } as const;
+
+const DISPLAY_FONT = RETRO_UI.font.display;
+const UI_FONT = RETRO_UI.font.ui;
 
 export class ResultScene extends Phaser.Scene {
   private navigationStarted = false;
@@ -55,6 +60,7 @@ export class ResultScene extends Phaser.Scene {
 
   create(data: ResultSceneData): void {
     configure2KCamera(this);
+    musicController.setTheme("result");
     this.matchSettings = readMatchSettings(
       this.registry.get(MATCH_SETTINGS_REGISTRY_KEY),
     );
@@ -84,13 +90,13 @@ export class ResultScene extends Phaser.Scene {
       .image(0, 0, getArenaDefinition(this.arenaId).textureKey)
       .setOrigin(0)
       .setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
-      .setTint(0x71809b);
+      .setTint(0xc4774f);
     this.add
       .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, COLORS.background, 0.68)
       .setOrigin(0);
     this.add
-      .circle(GAME_WIDTH / 2, 420, 390, 0x263b62, 0.42)
-      .setBlendMode(Phaser.BlendModes.ADD);
+      .rectangle(0, 0, GAME_WIDTH, 240, RETRO_UI.colors.orangeDark, 0.2)
+      .setOrigin(0);
   }
 
   private drawResultCard(data: ResultSceneData, playerRating: number): void {
@@ -98,18 +104,22 @@ export class ResultScene extends Phaser.Scene {
     const panel = this.add.graphics();
 
     panel.fillStyle(COLORS.panel, 0.97);
-    panel.fillRoundedRect(400, 165, 800, 570, 36);
-    panel.lineStyle(3, COLORS.panelStroke, 0.65);
-    panel.strokeRoundedRect(400, 165, 800, 570, 36);
-    panel.fillStyle(COLORS.amber, 0.12);
-    panel.fillCircle(800, 292, 92);
-    panel.lineStyle(4, COLORS.amber, 0.75);
-    panel.strokeCircle(800, 292, 68);
+    panel.fillRect(400, 165, 800, 570);
+    panel.lineStyle(8, RETRO_UI.colors.ink, 1);
+    panel.strokeRect(400, 165, 800, 570);
+    panel.lineStyle(4, COLORS.panelStroke, 0.95);
+    panel.strokeRect(412, 177, 776, 546);
+    panel.fillStyle(RETRO_UI.colors.panelActive, 1);
+    panel.fillRect(708, 220, 184, 144);
+    panel.lineStyle(5, COLORS.amber, 1);
+    panel.strokeRect(708, 220, 184, 144);
+    panel.lineStyle(2, RETRO_UI.colors.cyan, 1);
+    panel.strokeRect(716, 228, 168, 128);
 
     this.add
       .text(800, 292, STRINGS_RU.victoryIcon, {
-        color: "#ffd166",
-        fontFamily: "Arial, sans-serif",
+        color: RETRO_UI.text.orange,
+        fontFamily: UI_FONT,
         fontSize: "68px",
       })
       .setOrigin(0.5);
@@ -117,7 +127,7 @@ export class ResultScene extends Phaser.Scene {
     this.add
       .text(800, 398, STRINGS_RU.victoryTitle, {
         color: COLORS.amberText,
-        fontFamily: "Arial, sans-serif",
+        fontFamily: DISPLAY_FONT,
         fontSize: "24px",
         fontStyle: "bold",
         letterSpacing: 5,
@@ -127,7 +137,7 @@ export class ResultScene extends Phaser.Scene {
     this.add
       .text(800, 455, STRINGS_RU.victoryPlayerName(winnerName), {
         color: COLORS.primaryText,
-        fontFamily: "Arial, sans-serif",
+        fontFamily: UI_FONT,
         fontSize: "36px",
         fontStyle: "bold",
       })
@@ -139,8 +149,8 @@ export class ResultScene extends Phaser.Scene {
         548,
         `${this.matchSettings.playerNames.left} · РЕЙТИНГ ${playerRating}`,
         {
-          color: "#ffd166",
-          fontFamily: "Arial, sans-serif",
+          color: RETRO_UI.text.cyan,
+          fontFamily: UI_FONT,
           fontSize: "15px",
           fontStyle: "bold",
           letterSpacing: 1,
@@ -151,14 +161,15 @@ export class ResultScene extends Phaser.Scene {
     this.add
       .text(800, 507, STRINGS_RU.matchSummary(data.turnNumber), {
         color: COLORS.secondaryText,
-        fontFamily: "Arial, sans-serif",
+        fontFamily: UI_FONT,
         fontSize: "19px",
       })
       .setOrigin(0.5);
 
     const rematchButton = this.add
       .rectangle(640, 606, 280, 64, COLORS.mint)
-      .setStrokeStyle(3, 0xc7f7dc, 0.8);
+      .setFillStyle(COLORS.amber, 1)
+      .setStrokeStyle(4, RETRO_UI.colors.cream, 0.9);
     const rematchHitZone = this.add
       .rectangle(640, 606, 300, 110, 0xffffff, 0.001)
       .setInteractive({ useHandCursor: true });
@@ -166,7 +177,7 @@ export class ResultScene extends Phaser.Scene {
     this.add
       .text(640, 606, STRINGS_RU.rematchButton, {
         color: COLORS.buttonText,
-        fontFamily: "Arial, sans-serif",
+        fontFamily: UI_FONT,
         fontSize: "19px",
         fontStyle: "bold",
         letterSpacing: 2,
@@ -175,7 +186,7 @@ export class ResultScene extends Phaser.Scene {
 
     const arenaButton = this.add
       .rectangle(960, 606, 280, 64, COLORS.panel, 1)
-      .setStrokeStyle(3, COLORS.panelStroke, 0.85);
+      .setStrokeStyle(4, RETRO_UI.colors.cyan, 0.9);
     const arenaHitZone = this.add
       .rectangle(960, 606, 300, 110, 0xffffff, 0.001)
       .setInteractive({ useHandCursor: true });
@@ -183,7 +194,7 @@ export class ResultScene extends Phaser.Scene {
     this.add
       .text(960, 606, STRINGS_RU.chooseArenaButton, {
         color: COLORS.primaryText,
-        fontFamily: "Arial, sans-serif",
+        fontFamily: UI_FONT,
         fontSize: "17px",
         fontStyle: "bold",
         letterSpacing: 1,
@@ -193,16 +204,16 @@ export class ResultScene extends Phaser.Scene {
     this.add
       .text(800, 681, STRINGS_RU.resultHint, {
         color: COLORS.secondaryText,
-        fontFamily: "Arial, sans-serif",
+        fontFamily: UI_FONT,
         fontSize: "14px",
       })
       .setOrigin(0.5);
 
     rematchHitZone.on("pointerover", () => {
-      rematchButton.setScale(1.025);
+      rematchButton.setFillStyle(RETRO_UI.colors.cyan, 1);
     });
     rematchHitZone.on("pointerout", () => {
-      rematchButton.setScale(1);
+      rematchButton.setFillStyle(COLORS.amber, 1);
     });
     arenaHitZone.on("pointerover", () => {
       arenaButton.setStrokeStyle(4, COLORS.amber, 0.9);

@@ -26,6 +26,7 @@ export interface PlayerStatusEffects {
 export interface PlayerState {
   id: PlayerId;
   health: number;
+  repairUsed: boolean;
   catapultX: number;
   catapultY: number;
   ammunition: AmmunitionInventory;

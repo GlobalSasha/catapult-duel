@@ -104,7 +104,7 @@ describe("arena collision schemes", () => {
           (_, slotIndex) => {
             const centerX = getProtectionSlotCenterX(playerId, slotIndex);
 
-            (["wood", "net", "metal"] as const).forEach((type) => {
+            (["castle"] as const).forEach((type) => {
               const definition = getProtectionDefinition(type);
               const halfWidth = definition.width / 2;
               const centerHeight = getTerrainHeightAt(arena.terrain, centerX);
@@ -152,7 +152,7 @@ describe("arena collision schemes", () => {
 
         GAME_CONFIG.placement.protectionSlotCenters[playerId].forEach(
           (centerX) => {
-            (["wood", "net", "metal"] as const).forEach((type) => {
+            (["castle"] as const).forEach((type) => {
               const definition = getProtectionDefinition(type);
               const protection = {
                 x: centerX - definition.width / 2,

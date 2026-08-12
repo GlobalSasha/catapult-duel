@@ -9,6 +9,7 @@ import {
 } from "../core/projectileCatalog";
 import { STRINGS_RU } from "../i18n/strings.ru";
 import { PROJECTILE_TEXTURE_KEYS } from "../views/projectileVisuals";
+import { RETRO_UI } from "./retroTheme";
 
 export interface AimingValues {
   angleDeg: number;
@@ -20,13 +21,14 @@ interface AimingControlsCallbacks {
   onChange: (values: AimingValues) => void;
   onFire: (values: AimingValues) => void;
   onProjectileChange: (projectileType: ProjectileType) => boolean;
+  onRepair: () => boolean;
 }
 
 interface SliderView {
   hitZone: Phaser.GameObjects.Rectangle;
   track: Phaser.GameObjects.Rectangle;
   fill: Phaser.GameObjects.Rectangle;
-  knob: Phaser.GameObjects.Arc;
+  knob: Phaser.GameObjects.Rectangle;
   label: Phaser.GameObjects.Text;
   minimum: number;
   maximum: number;
@@ -43,21 +45,26 @@ interface ProjectileButtonView {
 }
 
 const COLORS = {
-  panel: 0x171a1c,
-  panelStroke: 0x8b6749,
-  track: 0x303539,
-  fill: 0x70b8b5,
-  knob: 0xc8b99d,
-  fire: 0xc87538,
+  panel: RETRO_UI.colors.panel,
+  panelStroke: RETRO_UI.colors.border,
+  track: RETRO_UI.colors.inkSoft,
+  fill: RETRO_UI.colors.cyan,
+  knob: RETRO_UI.colors.cream,
+  fire: RETRO_UI.colors.orange,
   fireDisabled: 0x51565a,
-  text: "#e7dfcf",
+  text: RETRO_UI.text.primary,
 } as const;
+
+const UI_FONT = RETRO_UI.font.ui;
 
 export class AimingControls extends Phaser.GameObjects.Container {
   private readonly angleSlider: SliderView;
   private readonly powerSlider: SliderView;
   private readonly fireButton: Phaser.GameObjects.Rectangle;
   private readonly fireHitZone: Phaser.GameObjects.Rectangle;
+  private readonly repairButton: Phaser.GameObjects.Rectangle;
+  private readonly repairHitZone: Phaser.GameObjects.Rectangle;
+  private readonly repairLabel: Phaser.GameObjects.Text;
   private readonly projectileButtons: readonly ProjectileButtonView[];
   private readonly projectileDetailTitle: Phaser.GameObjects.Text;
   private readonly projectileDetailDescription: Phaser.GameObjects.Text;
@@ -68,6 +75,8 @@ export class AimingControls extends Phaser.GameObjects.Container {
   private ammunition: AmmunitionInventory =
     createInitialAmmunition();
   private enabled = true;
+  private repairAvailable = false;
+  private repairUsed = false;
 
   constructor(
     scene: Phaser.Scene,
@@ -83,18 +92,6 @@ export class AimingControls extends Phaser.GameObjects.Container {
       { x: 948, width: 590 },
       { x: 1424, width: 232 },
     ] as const;
-    const panelShadows = dockSpecs.map(
-      ({ x, width }) =>
-        new Phaser.GameObjects.Rectangle(
-          scene,
-          x + 7,
-          850,
-          width,
-          104,
-          0x05080d,
-          0.48,
-        ),
-    );
     const panels = dockSpecs.map(({ x, width }) =>
       new Phaser.GameObjects.Rectangle(
         scene,
@@ -104,14 +101,14 @@ export class AimingControls extends Phaser.GameObjects.Container {
         104,
         COLORS.panel,
         0.96,
-      ).setStrokeStyle(3, COLORS.panelStroke, 0.7),
+      ).setStrokeStyle(4, COLORS.panelStroke, 0.9),
     );
     const panelDetail = new Phaser.GameObjects.Graphics(scene);
-    panelDetail.lineStyle(3, 0xc87538, 0.58);
+    panelDetail.lineStyle(4, RETRO_UI.colors.orange, 0.9);
     panelDetail.lineBetween(48, 788, 182, 788);
     panelDetail.lineBetween(670, 788, 786, 788);
     panelDetail.lineBetween(1324, 788, 1524, 788);
-    panelDetail.lineStyle(2, 0x6b8791, 0.34);
+    panelDetail.lineStyle(2, RETRO_UI.colors.cyan, 0.42);
     dockSpecs.forEach(({ x, width }) => {
       panelDetail.lineBetween(x - width / 2 + 14, 796, x + width / 2 - 14, 796);
     });
@@ -121,8 +118,8 @@ export class AimingControls extends Phaser.GameObjects.Container {
       803,
       "ОРУЖИЕ",
       {
-        color: "#9eb0cb",
-        fontFamily: "Arial, sans-serif",
+        color: RETRO_UI.text.cyan,
+        fontFamily: UI_FONT,
         fontSize: "10px",
         fontStyle: "bold",
         letterSpacing: 2,
@@ -166,17 +163,17 @@ export class AimingControls extends Phaser.GameObjects.Container {
       752,
       594,
       66,
-      0x101416,
+      RETRO_UI.colors.ink,
       0.94,
-    ).setStrokeStyle(2, 0x6b8791, 0.78);
+    ).setStrokeStyle(3, RETRO_UI.colors.border, 0.9);
     this.projectileDetailTitle = new Phaser.GameObjects.Text(
       scene,
       48,
       741,
       "",
       {
-        color: "#f0d18b",
-        fontFamily: "Arial, sans-serif",
+        color: RETRO_UI.text.orange,
+        fontFamily: UI_FONT,
         fontSize: "10px",
         fontStyle: "bold",
         letterSpacing: 1,
@@ -188,9 +185,9 @@ export class AimingControls extends Phaser.GameObjects.Container {
       765,
       "",
       {
-        color: "#b9c7ca",
-        fontFamily: "Arial, sans-serif",
-        fontSize: "9px",
+        color: RETRO_UI.text.secondary,
+        fontFamily: UI_FONT,
+        fontSize: "11px",
         fontStyle: "bold",
         wordWrap: { width: 548 },
       },
@@ -243,16 +240,7 @@ export class AimingControls extends Phaser.GameObjects.Container {
       COLORS.fire,
       1,
     )
-      .setStrokeStyle(2, 0xffe29a, 0.8);
-    const fireGlow = new Phaser.GameObjects.Rectangle(
-      scene,
-      1424,
-      842,
-      210,
-      82,
-      0xc87538,
-      0.13,
-    ).setBlendMode(Phaser.BlendModes.ADD);
+      .setStrokeStyle(4, RETRO_UI.colors.cream, 0.9);
 
     this.fireHitZone = new Phaser.GameObjects.Rectangle(
       scene,
@@ -272,11 +260,45 @@ export class AimingControls extends Phaser.GameObjects.Container {
       842,
       STRINGS_RU.fireButton,
       {
-        color: "#17130f",
-        fontFamily: "Arial, sans-serif",
+        color: RETRO_UI.text.ink,
+        fontFamily: UI_FONT,
         fontSize: "18px",
         fontStyle: "bold",
         letterSpacing: 2,
+      },
+    ).setOrigin(0.5);
+
+    this.repairButton = new Phaser.GameObjects.Rectangle(
+      scene,
+      1424,
+      754,
+      194,
+      46,
+      RETRO_UI.colors.success,
+      0.96,
+    ).setStrokeStyle(3, RETRO_UI.colors.cream, 0.86);
+    this.repairHitZone = new Phaser.GameObjects.Rectangle(
+      scene,
+      1424,
+      754,
+      222,
+      60,
+      0xffffff,
+      0.001,
+    )
+      .setScrollFactor(0)
+      .setInteractive({ useHandCursor: true });
+    this.repairLabel = new Phaser.GameObjects.Text(
+      scene,
+      1424,
+      754,
+      STRINGS_RU.repairButton,
+      {
+        color: RETRO_UI.text.ink,
+        fontFamily: UI_FONT,
+        fontSize: "11px",
+        fontStyle: "bold",
+        letterSpacing: 1,
       },
     ).setOrigin(0.5);
 
@@ -289,21 +311,38 @@ export class AimingControls extends Phaser.GameObjects.Container {
     });
     this.fireHitZone.on("pointerover", () => {
       if (this.enabled) {
-        this.fireButton.setScale(1.035);
+        this.fireButton.setFillStyle(RETRO_UI.colors.cyan, 1);
       }
     });
     this.fireHitZone.on("pointerout", () => {
-      this.fireButton.setScale(1);
+      this.fireButton.setFillStyle(
+        this.enabled ? COLORS.fire : COLORS.fireDisabled,
+        1,
+      );
+    });
+    this.repairHitZone.on("pointerdown", () => {
+      if (!this.enabled || !this.repairAvailable) {
+        return;
+      }
+
+      this.callbacks.onRepair();
+    });
+    this.repairHitZone.on("pointerover", () => {
+      if (this.enabled && this.repairAvailable) {
+        this.repairButton.setFillStyle(RETRO_UI.colors.cyan, 1);
+      }
+    });
+    this.repairHitZone.on("pointerout", () => {
+      this.updateRepairButton();
     });
 
     this.add([
-      ...panelShadows,
       ...panels,
       panelDetail,
       controlsTitle,
       ...rivets,
-      fireGlow,
       this.fireHitZone,
+      this.repairHitZone,
       ...this.projectileButtons.flatMap((button) => [
         button.hitZone,
         button.panel,
@@ -325,19 +364,11 @@ export class AimingControls extends Phaser.GameObjects.Container {
       this.powerSlider.label,
       this.fireButton,
       fireLabel,
+      this.repairButton,
+      this.repairLabel,
     ]);
     this.setDepth(1000);
     this.setScrollFactor(0);
-    scene.tweens.add({
-      targets: fireGlow,
-      alpha: 0.32,
-      scaleX: 1.045,
-      scaleY: 1.12,
-      duration: 1250,
-      yoyo: true,
-      repeat: -1,
-      ease: "Sine.easeInOut",
-    });
     this.projectileButtons.forEach((button, index) => {
       scene.tweens.add({
         targets: button.marker,
@@ -351,16 +382,29 @@ export class AimingControls extends Phaser.GameObjects.Container {
       });
     });
     this.updateProjectileButtons();
+    this.updateRepairButton();
   }
 
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
     this.setAlpha(enabled ? 1 : 0.58);
+    [this.angleSlider, this.powerSlider].forEach((slider) => {
+      if (slider.hitZone.input) {
+        slider.hitZone.input.enabled = enabled;
+      }
+      if (slider.knob.input) {
+        slider.knob.input.enabled = enabled;
+      }
+    });
+    if (this.fireHitZone.input) {
+      this.fireHitZone.input.enabled = enabled;
+    }
     this.fireButton.setFillStyle(
       enabled ? COLORS.fire : COLORS.fireDisabled,
       1,
     );
     this.updateProjectileButtons();
+    this.updateRepairButton();
   }
 
   getValues(): AimingValues {
@@ -378,6 +422,12 @@ export class AimingControls extends Phaser.GameObjects.Container {
     this.projectileType = projectileType;
     this.ammunition = { ...ammunition };
     this.updateProjectileButtons();
+  }
+
+  setRepairState(available: boolean, used: boolean): void {
+    this.repairAvailable = available;
+    this.repairUsed = used;
+    this.updateRepairButton();
   }
 
   setPowerMaximum(maximum: number): void {
@@ -430,7 +480,7 @@ export class AimingControls extends Phaser.GameObjects.Container {
       {
         align: "center",
         color: COLORS.text,
-        fontFamily: "Arial, sans-serif",
+        fontFamily: UI_FONT,
         fontSize: "8px",
         fontStyle: "bold",
         letterSpacing: 0.5,
@@ -479,7 +529,7 @@ export class AimingControls extends Phaser.GameObjects.Container {
       const active = this.enabled && !unavailable;
 
       button.panel.setFillStyle(
-        selected ? 0x51412f : COLORS.track,
+        selected ? RETRO_UI.colors.panelActive : COLORS.track,
         selected ? 1 : 0.96,
       );
       button.panel.setStrokeStyle(
@@ -512,6 +562,29 @@ export class AimingControls extends Phaser.GameObjects.Container {
     this.projectileDetailDescription.setText(
       STRINGS_RU.projectileDescription(this.projectileType),
     );
+  }
+
+  private updateRepairButton(): void {
+    const active = this.enabled && this.repairAvailable;
+
+    this.repairButton
+      .setFillStyle(
+        active ? RETRO_UI.colors.success : COLORS.fireDisabled,
+        active ? 0.96 : 0.82,
+      )
+      .setAlpha(active ? 1 : 0.64);
+    this.repairLabel
+      .setText(
+        this.repairAvailable
+          ? STRINGS_RU.repairButton
+          : this.repairUsed
+            ? STRINGS_RU.repairUnavailableButton
+            : STRINGS_RU.repairFullHealthButton,
+      )
+      .setAlpha(active ? 1 : 0.52);
+    if (this.repairHitZone.input) {
+      this.repairHitZone.input.enabled = active;
+    }
   }
 
   private getProjectileCardLabel(projectileType: ProjectileType): string {
@@ -576,18 +649,16 @@ export class AimingControls extends Phaser.GameObjects.Container {
       COLORS.fill,
       1,
     ).setOrigin(0, 0.5);
-    const knob = new Phaser.GameObjects.Arc(
+    const knob = new Phaser.GameObjects.Rectangle(
       options.scene,
       options.startX,
       options.y,
-      22,
-      0,
-      360,
-      false,
+      28,
+      34,
       COLORS.knob,
       1,
     )
-      .setStrokeStyle(3, COLORS.fill, 1)
+      .setStrokeStyle(RETRO_UI.line.selected, COLORS.fill, 1)
       .setScrollFactor(0)
       .setInteractive({ useHandCursor: true });
     const label = new Phaser.GameObjects.Text(
@@ -597,7 +668,7 @@ export class AimingControls extends Phaser.GameObjects.Container {
       options.label,
       {
         color: COLORS.text,
-        fontFamily: "Arial, sans-serif",
+        fontFamily: UI_FONT,
         fontSize: "17px",
         fontStyle: "bold",
       },
@@ -631,7 +702,10 @@ export class AimingControls extends Phaser.GameObjects.Container {
     };
 
     hitZone.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
-      setFromX(pointer.x);
+      const camera = options.scene.cameras.main;
+      const localX =
+        pointer.x / camera.zoom + camera.scrollX * hitZone.scrollFactorX;
+      setFromX(localX);
     });
     options.scene.input.setDraggable(knob);
     options.scene.input.setDraggable(hitZone);

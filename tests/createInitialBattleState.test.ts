@@ -39,11 +39,12 @@ describe("createInitialBattleState", () => {
         left: {
           id: "left",
           health: GAME_CONFIG.catapult.maxHealth,
+          repairUsed: false,
           catapultX: arena.spawnX.left,
           catapultY: getTerrainHeightAt(
             arena.terrain,
             arena.spawnX.left,
-          ),
+          ) - GAME_CONFIG.protections.castle.height + 8,
           ammunition: createInitialAmmunition(),
           selectedProjectileType: "stone",
           effects: {
@@ -54,11 +55,12 @@ describe("createInitialBattleState", () => {
         right: {
           id: "right",
           health: GAME_CONFIG.catapult.maxHealth,
+          repairUsed: false,
           catapultX: arena.spawnX.right,
           catapultY: getTerrainHeightAt(
             arena.terrain,
             arena.spawnX.right,
-          ),
+          ) - GAME_CONFIG.protections.castle.height + 8,
           ammunition: createInitialAmmunition(),
           selectedProjectileType: "stone",
           effects: {

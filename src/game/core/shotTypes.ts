@@ -19,17 +19,26 @@ export interface FlightPoint {
   y: number;
 }
 
-export interface ImpactEvent {
+export type CatapultHitZone = "arm" | "frame" | "wheels";
+
+export interface ImpactKinematics {
+  velocityX?: number;
+  velocityY?: number;
+  normalImpactRatio?: number;
+}
+
+export interface ImpactEvent extends ImpactKinematics {
   targetId: PlayerId;
   x: number;
   y: number;
   impactSpeed: number;
   damage: number;
+  hitZone?: CatapultHitZone;
 }
 
 export type DestructibleTargetKind = "protection" | "obstacle";
 
-export interface ObjectImpactEvent {
+export interface ObjectImpactEvent extends ImpactKinematics {
   targetKind: DestructibleTargetKind;
   targetId: string;
   x: number;
@@ -82,7 +91,51 @@ export interface DurabilityEvent {
   y: number;
 }
 
-export type BattleEvent = DamageEvent | StatusEvent | DurabilityEvent;
+export type MaterialReaction =
+  | "splinter"
+  | "tear"
+  | "spark"
+  | "crack"
+  | "scorch"
+  | "frost"
+  | "dust";
+
+export interface MaterialReactionEvent {
+  kind: "material-reaction";
+  reaction: MaterialReaction;
+  projectileType: ProjectileType;
+  targetKind?: DestructibleTargetKind | "catapult";
+  targetId?: string;
+  x: number;
+  y: number;
+  intensity: number;
+}
+
+export interface DisplacementEvent {
+  kind: "displacement";
+  targetId: PlayerId;
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+  distance: number;
+}
+
+export interface RepairEvent {
+  kind: "repair";
+  targetId: PlayerId;
+  amount: number;
+  health: number;
+  maximumHealth: number;
+}
+
+export type BattleEvent =
+  | DamageEvent
+  | StatusEvent
+  | DurabilityEvent
+  | MaterialReactionEvent
+  | DisplacementEvent
+  | RepairEvent;
 
 export interface BattleTransition {
   state: import("./battleTypes").BattleState;

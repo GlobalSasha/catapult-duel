@@ -162,6 +162,63 @@ describe("BattleController", () => {
     expect(controller.getState().phase).toBe("aiming");
   });
 
+  it("repairs 25% of total health once without spending the turn", () => {
+    const initialState = createInitialBattleState();
+    initialState.players.left.health = 40;
+    const controller = new BattleController(initialState);
+    const result = controller.repair("left");
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      throw new Error("Expected repair to succeed.");
+    }
+
+    expect(result.restoredHealth).toBe(
+      Math.round(
+        GAME_CONFIG.catapult.maxHealth * GAME_CONFIG.repair.healthRatio,
+      ),
+    );
+    expect(result.transition.state).toMatchObject({
+      phase: "aiming",
+      activePlayerId: "left",
+      turnNumber: 1,
+    });
+    expect(result.transition.state.players.left).toMatchObject({
+      health: 65,
+      repairUsed: true,
+    });
+    expect(controller.repair("left")).toEqual({
+      ok: false,
+      reason: "already-used",
+    });
+    expect(controller.fire(createCommand()).ok).toBe(true);
+  });
+
+  it("caps repair at maximum health and rejects invalid use", () => {
+    const damagedState = createInitialBattleState();
+    damagedState.players.left.health = 90;
+    const controller = new BattleController(damagedState);
+    const result = controller.repair("left");
+
+    expect(result.ok && result.restoredHealth).toBe(10);
+    expect(controller.getState().players.left.health).toBe(
+      GAME_CONFIG.catapult.maxHealth,
+    );
+
+    const freshController = new BattleController();
+    expect(freshController.repair("left")).toEqual({
+      ok: false,
+      reason: "full-health",
+    });
+    expect(freshController.repair("right")).toEqual({
+      ok: false,
+      reason: "not-active-player",
+    });
+    expect(freshController.getState()).toEqual(
+      new BattleController().getState(),
+    );
+  });
+
   it("returns typed validation errors without changing the match", () => {
     const controller = new BattleController();
     const initialState = controller.getState();

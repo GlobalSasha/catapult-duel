@@ -55,19 +55,28 @@ import {
   AimingControls,
   type AimingValues,
 } from "../ui/AimingControls";
+import { RETRO_UI } from "../ui/retroTheme";
+import { musicController } from "../audio/MusicController";
 import { CatapultView } from "../views/CatapultView";
 import { createCastleAmbientEffects } from "../views/CastleAmbientEffects";
-import { drawProtectionBody } from "../views/drawProtection";
+import {
+  createCastleTowerSprite,
+  PROTECTION_VIEW_COLORS,
+} from "../views/drawProtection";
 import { PROJECTILE_TEXTURE_KEYS } from "../views/projectileVisuals";
 
 const COLORS = {
-  panel: 0x171a1c,
-  panelStroke: 0x8b6749,
-  primaryText: "#eee5d4",
-  secondaryText: "#b5a58d",
-  accent: "#d28a42",
-  ready: "#70b8b5",
+  panel: RETRO_UI.colors.panel,
+  panelRaised: RETRO_UI.colors.panelRaised,
+  panelStroke: RETRO_UI.colors.border,
+  primaryText: RETRO_UI.text.primary,
+  secondaryText: RETRO_UI.text.secondary,
+  accent: RETRO_UI.text.orange,
+  ready: RETRO_UI.text.cyan,
 } as const;
+
+const DISPLAY_FONT = RETRO_UI.font.display;
+const UI_FONT = RETRO_UI.font.ui;
 
 interface BattleSceneData {
   arenaId?: ArenaId;
@@ -76,9 +85,11 @@ interface BattleSceneData {
 }
 
 interface DestructibleView {
-  body: Phaser.GameObjects.Graphics;
+  body: Phaser.GameObjects.Graphics | Phaser.GameObjects.Image;
   damageOverlay: Phaser.GameObjects.Graphics;
   cracks: Phaser.GameObjects.Graphics;
+  impactMarks: Phaser.GameObjects.Graphics;
+  impactMarkCount: number;
   durabilityBackground: Phaser.GameObjects.Rectangle;
   durabilityFill: Phaser.GameObjects.Rectangle;
   rubble: Phaser.GameObjects.Graphics;
@@ -97,7 +108,7 @@ export class BattleScene extends Phaser.Scene {
   private statusText!: Phaser.GameObjects.Text;
   private weatherText!: Phaser.GameObjects.Text;
   private windText!: Phaser.GameObjects.Text;
-  private worldPositionMarker!: Phaser.GameObjects.Arc;
+  private worldPositionMarker!: Phaser.GameObjects.Rectangle;
   private cachedPreviewPoints: FlightPoint[] = [];
   private previewDashOffset = 0;
   private previewShimmerPhase = 0;
@@ -118,6 +129,7 @@ export class BattleScene extends Phaser.Scene {
 
   create(data: BattleSceneData): void {
     configure2KCamera(this);
+    musicController.setTheme("battle");
     this.matchSettings = readMatchSettings(
       this.registry.get(MATCH_SETTINGS_REGISTRY_KEY),
     );
@@ -173,6 +185,7 @@ export class BattleScene extends Phaser.Scene {
       },
     });
     this.createCatapultViews();
+    this.cameras.main.fadeIn(300, 10, 8, 6);
     this.fogOfWar = this.add.graphics().setDepth(40);
     this.updateFogOfWar();
     this.aimingControls = new AimingControls(this, {
@@ -189,6 +202,7 @@ export class BattleScene extends Phaser.Scene {
         }
         return selected;
       },
+      onRepair: () => this.repairActivePlayer(),
     });
     this.input.keyboard?.on("keydown", this.handleKeyDown, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -227,14 +241,20 @@ export class BattleScene extends Phaser.Scene {
         0,
         GAME_CONFIG.world.width,
         GAME_HEIGHT,
-        0x08101e,
-        0.17,
+        RETRO_UI.colors.orangeDark,
+        0.08,
       )
       .setOrigin(0)
       .setDepth(-95);
 
     this.drawDynamicWorldLayers(arena);
-    this.drawWastelandInfrastructure(arena);
+    const usesPremiumMapPackage = arena.obstacles.every(
+      ({ textureKey }) => textureKey !== undefined,
+    );
+
+    if (!usesPremiumMapPackage) {
+      this.drawWastelandInfrastructure(arena);
+    }
 
     const terrain = this.add.graphics().setDepth(-40);
     const firstPoint = arena.terrain[0];
@@ -282,10 +302,12 @@ export class BattleScene extends Phaser.Scene {
       .protections.forEach((protection) => {
         this.drawProtection(protection);
       });
-    this.drawAmbientLife(arena);
+    if (!usesPremiumMapPackage) {
+      this.drawAmbientLife(arena);
+    }
 
     this.add
-      .rectangle(0, 0, GAME_WIDTH, 196, 0x08101e, 0.62)
+      .rectangle(0, 0, GAME_WIDTH, 196, RETRO_UI.colors.ink, 0.88)
       .setOrigin(0)
       .setScrollFactor(0)
       .setDepth(800);
@@ -832,6 +854,26 @@ export class BattleScene extends Phaser.Scene {
     arena: ArenaDefinition,
     obstacle: ArenaObstacle,
   ): void {
+    if (obstacle.textureKey) {
+      const sprite = this.add
+        .image(obstacle.x, obstacle.y, obstacle.textureKey)
+        .setOrigin(0)
+        .setDisplaySize(obstacle.width, obstacle.height)
+        .setFlipX(obstacle.flipX ?? false)
+        .setDepth(5);
+
+      this.registerDestructibleView(
+        obstacle.id,
+        obstacle.x,
+        obstacle.y,
+        obstacle.width,
+        obstacle.height,
+        sprite,
+        arena.palette.obstacleStrokeColor,
+      );
+      return;
+    }
+
     const graphics = this.add.graphics().setDepth(5);
 
     graphics.fillStyle(arena.palette.obstacleColor, 0.98);
@@ -935,8 +977,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private drawProtection(protection: ProtectionState): void {
-    const graphics = this.add.graphics().setDepth(7);
-    const detailColor = drawProtectionBody(graphics, protection);
+    const tower = createCastleTowerSprite(this, protection, 7);
 
     this.registerDestructibleView(
       protection.id,
@@ -944,8 +985,8 @@ export class BattleScene extends Phaser.Scene {
       protection.y,
       protection.width,
       protection.height,
-      graphics,
-      detailColor,
+      tower,
+      PROTECTION_VIEW_COLORS.castle.detail,
     );
   }
 
@@ -955,11 +996,12 @@ export class BattleScene extends Phaser.Scene {
     y: number,
     width: number,
     height: number,
-    body: Phaser.GameObjects.Graphics,
+    body: Phaser.GameObjects.Graphics | Phaser.GameObjects.Image,
     accentColor: number,
   ): void {
     const damageOverlay = this.add.graphics().setDepth(8);
     const cracks = this.add.graphics().setDepth(9);
+    const impactMarks = this.add.graphics().setDepth(10);
     const durabilityBackground = this.add
       .rectangle(x, y - 14, width, 7, 0x111a28, 0.92)
       .setOrigin(0, 0.5)
@@ -987,6 +1029,8 @@ export class BattleScene extends Phaser.Scene {
       body,
       damageOverlay,
       cracks,
+      impactMarks,
+      impactMarkCount: 0,
       durabilityBackground,
       durabilityFill,
       rubble,
@@ -1014,6 +1058,7 @@ export class BattleScene extends Phaser.Scene {
 
     view.body.setVisible(!destroyed).setAlpha(0.58 + ratio * 0.42);
     view.damageOverlay.clear().setVisible(damaged);
+    view.impactMarks.setVisible(!destroyed);
     view.rubble.setVisible(destroyed);
     view.durabilityBackground.setVisible(damaged);
     view.durabilityFill
@@ -1072,13 +1117,23 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private drawHeader(): void {
+    const frame = this.add.graphics().setScrollFactor(0).setDepth(900);
+    frame.lineStyle(RETRO_UI.line.selected, RETRO_UI.colors.orange, 0.9);
+    frame.lineBetween(0, 192, GAME_WIDTH, 192);
+    frame.lineStyle(RETRO_UI.line.hairline, RETRO_UI.colors.border, 0.7);
+    frame.lineBetween(0, 184, GAME_WIDTH, 184);
+    frame.fillStyle(RETRO_UI.colors.orange, 1);
+    frame.fillRect(44, 40, 8, 88);
+
     this.add
       .text(64, 48, STRINGS_RU.gameTitle, {
-        color: COLORS.primaryText,
-        fontFamily: "Arial, sans-serif",
-        fontSize: "34px",
+        color: RETRO_UI.text.orange,
+        fontFamily: DISPLAY_FONT,
+        fontSize: "36px",
         fontStyle: "bold",
-        letterSpacing: 3,
+        letterSpacing: 4,
+        stroke: RETRO_UI.text.ink,
+        strokeThickness: 6,
       })
       .setOrigin(0, 0)
       .setScrollFactor(0)
@@ -1087,8 +1142,8 @@ export class BattleScene extends Phaser.Scene {
     this.add
       .text(66, 94, STRINGS_RU.battleSubtitle, {
         color: COLORS.secondaryText,
-        fontFamily: "Arial, sans-serif",
-        fontSize: "17px",
+        fontFamily: UI_FONT,
+        fontSize: "15px",
         letterSpacing: 2,
       })
       .setOrigin(0, 0)
@@ -1096,15 +1151,17 @@ export class BattleScene extends Phaser.Scene {
       .setDepth(901);
 
     const badge = this.add.graphics().setScrollFactor(0).setDepth(901);
-    badge.fillStyle(0x7ee2a8, 0.12);
-    badge.fillRoundedRect(1250, 42, 286, 82, 18);
-    badge.lineStyle(2, 0x7ee2a8, 0.35);
-    badge.strokeRoundedRect(1250, 42, 286, 82, 18);
+    badge.fillStyle(COLORS.panel, 0.98);
+    badge.fillRect(1250, 42, 286, 82);
+    badge.lineStyle(RETRO_UI.line.selected, RETRO_UI.colors.ink, 1);
+    badge.strokeRect(1250, 42, 286, 82);
+    badge.lineStyle(RETRO_UI.line.hairline, RETRO_UI.colors.cyan, 0.85);
+    badge.strokeRect(1258, 50, 270, 66);
 
     this.weatherText = this.add
       .text(1393, 67, "", {
         color: COLORS.ready,
-        fontFamily: "Arial, sans-serif",
+        fontFamily: UI_FONT,
         fontSize: "16px",
         fontStyle: "bold",
       })
@@ -1115,7 +1172,7 @@ export class BattleScene extends Phaser.Scene {
     this.windText = this.add
       .text(1393, 98, "", {
         color: COLORS.primaryText,
-        fontFamily: "Arial, sans-serif",
+        fontFamily: UI_FONT,
         fontSize: "14px",
         fontStyle: "bold",
       })
@@ -1127,15 +1184,17 @@ export class BattleScene extends Phaser.Scene {
   private createStatus(): void {
     const panel = this.add.graphics().setScrollFactor(0).setDepth(900);
 
-    panel.fillStyle(COLORS.panel, 0.94);
-    panel.fillRoundedRect(475, 124, 650, 54, 18);
-    panel.lineStyle(2, COLORS.panelStroke, 0.4);
-    panel.strokeRoundedRect(475, 124, 650, 54, 18);
+    panel.fillStyle(COLORS.panel, 0.98);
+    panel.fillRect(475, 124, 650, 54);
+    panel.lineStyle(RETRO_UI.line.hairline, COLORS.panelStroke, 0.76);
+    panel.strokeRect(475, 124, 650, 54);
+    panel.fillStyle(RETRO_UI.colors.orange, 1);
+    panel.fillRect(475, 124, 7, 54);
 
     this.statusText = this.add
       .text(800, 151, this.getAimingStatus(), {
         color: COLORS.primaryText,
-        fontFamily: "Arial, sans-serif",
+        fontFamily: UI_FONT,
         fontSize: "18px",
         fontStyle: "bold",
       })
@@ -1150,18 +1209,25 @@ export class BattleScene extends Phaser.Scene {
     const railWidth = 250;
     const rail = this.add.graphics().setScrollFactor(0).setDepth(905);
 
-    rail.fillStyle(0x0b1320, 0.9);
-    rail.fillRoundedRect(railX, railY, railWidth, 18, 9);
-    rail.lineStyle(2, 0x8ba4c8, 0.55);
-    rail.strokeRoundedRect(railX, railY, railWidth, 18, 9);
-    rail.fillStyle(0x9ec5ff, 1);
-    rail.fillCircle(railX + 9, railY + 9, 6);
-    rail.fillStyle(0xffb29b, 1);
-    rail.fillCircle(railX + railWidth - 9, railY + 9, 6);
+    rail.fillStyle(RETRO_UI.colors.ink, 0.95);
+    rail.fillRect(railX, railY, railWidth, 18);
+    rail.lineStyle(RETRO_UI.line.hairline, RETRO_UI.colors.border, 0.72);
+    rail.strokeRect(railX, railY, railWidth, 18);
+    rail.fillStyle(RETRO_UI.colors.playerLeft, 1);
+    rail.fillRect(railX + 4, railY + 4, 10, 10);
+    rail.fillStyle(RETRO_UI.colors.playerRight, 1);
+    rail.fillRect(railX + railWidth - 14, railY + 4, 10, 10);
 
     this.worldPositionMarker = this.add
-      .circle(railX + 9, railY + 9, 8, 0xffd166, 1)
-      .setStrokeStyle(3, 0xfff0bd, 0.95)
+      .rectangle(
+        railX + 9,
+        railY + 9,
+        14,
+        24,
+        RETRO_UI.colors.orange,
+        1,
+      )
+      .setStrokeStyle(2, RETRO_UI.colors.cream, 0.95)
       .setScrollFactor(0)
       .setDepth(906);
     this.updateWorldMarker(
@@ -1231,6 +1297,12 @@ export class BattleScene extends Phaser.Scene {
     );
     this.aimingControls.setPowerMaximum(
       getPlayerMaximumPower(activePlayer),
+    );
+    this.aimingControls.setRepairState(
+      battleState.phase === "aiming" &&
+        !activePlayer.repairUsed &&
+        activePlayer.health < GAME_CONFIG.catapult.maxHealth,
+      activePlayer.repairUsed,
     );
     this.weatherText.setText(
       STRINGS_RU.weatherName(battleState.weather.id),
@@ -1385,7 +1457,7 @@ export class BattleScene extends Phaser.Scene {
       launchPoint ??
       this.catapultViews[
         battleState.activePlayerId
-      ].getLoadedProjectileWorldPosition();
+      ].getReleaseProjectileWorldPosition();
 
     return {
       playerId: battleState.activePlayerId,
@@ -1444,12 +1516,40 @@ export class BattleScene extends Phaser.Scene {
       return;
     }
 
+    if (event.code === "KeyR") {
+      event.preventDefault();
+      this.repairActivePlayer();
+      return;
+    }
+
     if (event.code !== "Space") {
       return;
     }
 
     event.preventDefault();
     this.fire(this.aimingControls.getValues());
+  }
+
+  private repairActivePlayer(): boolean {
+    const before = this.battleController.getState();
+    const result = this.battleController.repair(before.activePlayerId);
+
+    if (!result.ok) {
+      this.statusText.setText(STRINGS_RU.repairUnavailableStatus);
+      return false;
+    }
+
+    this.renderBattleState();
+    this.showBattleEvents(result.transition.events);
+    this.statusText.setText(
+      STRINGS_RU.repairStatus(
+        result.restoredHealth,
+        result.transition.state.players[before.activePlayerId].health,
+      ),
+    );
+    this.playTone(640, 0.18, "sine", 0.035, 920);
+    this.redrawPreview(this.aimingControls.getValues());
+    return true;
   }
 
   private fire(values: AimingValues): void {
@@ -1577,7 +1677,7 @@ export class BattleScene extends Phaser.Scene {
     this.renderBattleState();
     this.showBattleEvents(transition.events);
 
-    const impactPoint = shot.points.at(-1);
+    const impactPoint = shot.impact ?? shot.objectImpact ?? shot.points.at(-1);
     const explodes = ["impact", "ground", "obstacle"].includes(
       shot.endReason,
     );
@@ -1747,6 +1847,24 @@ export class BattleScene extends Phaser.Scene {
         return;
       }
 
+      const aiPlayer = this.battleController.getState().players.right;
+
+      if (
+        !aiPlayer.repairUsed &&
+        aiPlayer.health <=
+          GAME_CONFIG.catapult.maxHealth *
+            (1 - GAME_CONFIG.repair.healthRatio)
+      ) {
+        this.repairActivePlayer();
+        this.statusText.setText(
+          STRINGS_RU.aiThinkingStatus(
+            STRINGS_RU.aiDifficultyName(
+              this.matchSettings.aiDifficulty,
+            ),
+          ),
+        );
+      }
+
       const values = this.chooseAiAimingValues();
       this.selectProjectile(values.projectileType);
       this.catapultViews.right.setAim(values.angleDeg, values.power);
@@ -1834,20 +1952,26 @@ export class BattleScene extends Phaser.Scene {
       this.catapultViews[targetId].getDamageLabelPosition();
     const label = this.add
       .text(position.x, position.y, STRINGS_RU.damageTaken(damage), {
-        color: "#ff8a65",
-        fontFamily: "Arial, sans-serif",
-        fontSize: "36px",
+        color: RETRO_UI.text.danger,
+        fontFamily: DISPLAY_FONT,
+        fontSize: "44px",
         fontStyle: "bold",
+        stroke: RETRO_UI.text.ink,
+        strokeThickness: 9,
+        backgroundColor: "#17140fcc",
+        padding: { x: 13, y: 7 },
       })
       .setOrigin(0.5)
+      .setScale(0.68)
       .setDepth(1100);
 
     this.tweens.add({
       targets: label,
-      y: position.y - 65,
+      y: position.y - 88,
+      scale: 1.08,
       alpha: 0,
-      duration: 900,
-      ease: "Cubic.easeOut",
+      duration: 1450,
+      ease: "Back.easeOut",
       onComplete: () => {
         label.destroy();
       },
@@ -2193,12 +2317,30 @@ export class BattleScene extends Phaser.Scene {
       left: 0,
       right: 0,
     };
+    const impactDamageByPlayer: Record<PlayerId, number> = {
+      left: 0,
+      right: 0,
+    };
 
     events.forEach((event) => {
       if (event.kind === "damage") {
         damageByPlayer[event.targetId] += event.amount;
+        if (event.source !== "burning") {
+          impactDamageByPlayer[event.targetId] += event.amount;
+        }
       } else if (event.kind === "durability") {
-        this.showDurabilityDamage(event.x, event.y, event.amount);
+        this.showDurabilityDamage(event);
+      } else if (event.kind === "material-reaction") {
+        this.showMaterialReaction(event);
+      } else if (event.kind === "displacement") {
+        this.catapultViews[event.targetId].playDisplacement(
+          event.fromX,
+          event.fromY,
+          event.toX,
+          event.toY,
+        );
+      } else if (event.kind === "repair") {
+        this.showRepair(event.targetId, event.amount);
       }
     });
 
@@ -2206,37 +2348,427 @@ export class BattleScene extends Phaser.Scene {
       const damage = damageByPlayer[playerId];
 
       if (damage > 0) {
-        this.catapultViews[playerId].playImpact();
+        this.catapultViews[playerId].playImpact(damage);
+        if (impactDamageByPlayer[playerId] > 0) {
+          this.showCatapultDebris(
+            playerId,
+            impactDamageByPlayer[playerId],
+          );
+        }
         this.showDamage(playerId, damage);
       }
     });
   }
 
-  private showDurabilityDamage(
-    x: number,
-    y: number,
+  private showCatapultDebris(
+    targetId: PlayerId,
     damage: number,
   ): void {
+    const catapult = this.catapultViews[targetId];
+    const direction = targetId === "left" ? -1 : 1;
+    const intensity = Phaser.Math.Clamp(damage / 35, 0.55, 1.5);
+    const fragmentCount = Math.round(7 + intensity * 5);
+    const originX = catapult.x;
+    const originY = catapult.y - 18;
+
+    for (let index = 0; index < fragmentCount; index += 1) {
+      const isWheel = index === 0;
+      const isMetal = !isWheel && index % 4 === 0;
+      let fragment:
+        | Phaser.GameObjects.Graphics
+        | Phaser.GameObjects.Arc
+        | Phaser.GameObjects.Rectangle;
+
+      if (isWheel) {
+        const wheel = this.add.graphics();
+        wheel.lineStyle(3, 0x5b321c, 1);
+        wheel.strokeCircle(0, 0, 7);
+        wheel.lineStyle(2, 0xc07a35, 0.95);
+        wheel.lineBetween(-6, 0, 6, 0);
+        wheel.lineBetween(0, -6, 0, 6);
+        wheel.fillStyle(0xd39a4a, 1);
+        wheel.fillCircle(0, 0, 2.5);
+        fragment = wheel;
+      } else if (isMetal) {
+        fragment = this.add
+          .circle(0, 0, 3 + (index % 2), 0x9aa4aa, 1)
+          .setStrokeStyle(1.5, 0x34383a, 1);
+      } else {
+        fragment = this.add
+          .rectangle(
+            0,
+            0,
+            index === 1 ? 24 : 9 + (index % 4) * 4,
+            index === 1 ? 5 : 3 + (index % 2) * 2,
+            index % 3 === 0 ? 0xd58a39 : 0x7a4526,
+            1,
+          )
+          .setStrokeStyle(1, 0x3c2418, 0.9);
+      }
+
+      const spread = (index - (fragmentCount - 1) / 2) * 6;
+      const travelX =
+        direction * (45 + intensity * 45 + (index % 4) * 15) + spread;
+      const lift = 45 + intensity * 46 + (index % 5) * 10;
+      const duration = 620 + (index % 5) * 75;
+
+      fragment
+        .setPosition(originX + (index % 3) * 3, originY)
+        .setRotation(Phaser.Math.DegToRad(index * 29))
+        .setDepth(76);
+
+      this.tweens.add({
+        targets: fragment,
+        x: originX + travelX,
+        angle: direction * (220 + index * 67),
+        duration,
+        ease: "Quad.easeOut",
+      });
+      this.tweens.add({
+        targets: fragment,
+        y: originY - lift,
+        duration: duration * 0.42,
+        ease: "Cubic.easeOut",
+        onComplete: () => {
+          this.tweens.add({
+            targets: fragment,
+            y: originY + 70 + (index % 3) * 14,
+            alpha: 0,
+            duration: duration * 0.72,
+            ease: "Quad.easeIn",
+            onComplete: () => fragment.destroy(),
+          });
+        },
+      });
+    }
+  }
+
+  private showRepair(playerId: PlayerId, amount: number): void {
+    const position = this.catapultViews[playerId].getDamageLabelPosition();
+    const ring = this.add
+      .circle(
+        this.catapultViews[playerId].x,
+        this.catapultViews[playerId].y - 42,
+        42,
+        RETRO_UI.colors.success,
+        0.14,
+      )
+      .setStrokeStyle(5, RETRO_UI.colors.success, 0.9)
+      .setDepth(1098);
     const label = this.add
-      .text(x, y - 20, STRINGS_RU.durabilityDamageTaken(damage), {
-        color: "#ffd166",
-        fontFamily: "Arial, sans-serif",
-        fontSize: "27px",
+      .text(position.x, position.y, `+${amount} HP`, {
+        color: RETRO_UI.text.success,
+        fontFamily: DISPLAY_FONT,
+        fontSize: "30px",
         fontStyle: "bold",
-        stroke: "#111a28",
+        stroke: RETRO_UI.text.ink,
         strokeThickness: 6,
       })
       .setOrigin(0.5)
       .setDepth(1100);
 
     this.tweens.add({
-      targets: label,
-      y: y - 75,
+      targets: ring,
+      scale: 2,
       alpha: 0,
-      duration: 950,
+      duration: 650,
+      ease: "Cubic.easeOut",
+      onComplete: () => ring.destroy(),
+    });
+    this.tweens.add({
+      targets: label,
+      y: position.y - 65,
+      alpha: 0,
+      duration: 1000,
       ease: "Cubic.easeOut",
       onComplete: () => label.destroy(),
     });
+  }
+
+  private showMaterialReaction(
+    event: Extract<BattleEvent, { kind: "material-reaction" }>,
+  ): void {
+    const { x, y, reaction, intensity } = event;
+    const palette = {
+      splinter: [0xc99355, 0x6e4228],
+      tear: [0xd8c89b, 0x6b6555],
+      spark: [0xffd166, 0xffffff],
+      crack: [0xa79784, 0x51483f],
+      scorch: [0xff7043, 0x2b1a16],
+      frost: [0x8fe8ff, 0xe8fbff],
+      dust: [0xc7a574, 0x766048],
+    }[reaction];
+    const fragmentCount = Math.round(8 + intensity * 7);
+
+    for (let index = 0; index < fragmentCount; index += 1) {
+      const angle =
+        -Math.PI * 0.88 +
+        (Math.PI * 0.76 * index) / Math.max(1, fragmentCount - 1);
+      const distance = 48 + intensity * 52 + (index % 3) * 12;
+      const fragment = this.add
+        .rectangle(
+          x,
+          y,
+          reaction === "spark" ? 10 : 7 + (index % 4) * 3,
+          reaction === "tear" ? 3 : 5 + (index % 2) * 3,
+          index % 2 === 0 ? palette[0] : palette[1],
+          1,
+        )
+        .setStrokeStyle(
+          reaction === "crack" ? 2 : 1,
+          reaction === "crack" ? 0x2d2925 : palette[1],
+          0.9,
+        )
+        .setRotation(angle)
+        .setDepth(74);
+
+      this.tweens.add({
+        targets: fragment,
+        x: x + Math.cos(angle) * distance,
+        angle: Phaser.Math.RadToDeg(angle) + index * 55,
+        duration: 620 + index * 28,
+        ease: "Quad.easeOut",
+      });
+      this.tweens.add({
+        targets: fragment,
+        y: y - 46 - intensity * 38 - (index % 5) * 11,
+        duration: 270 + index * 12,
+        ease: "Cubic.easeOut",
+        onComplete: () => {
+          this.tweens.add({
+            targets: fragment,
+            y: y + 66 + (index % 3) * 12,
+            alpha: 0,
+            scale: 0.55,
+            duration: 560 + index * 18,
+            ease: "Quad.easeIn",
+            onComplete: () => fragment.destroy(),
+          });
+        },
+      });
+    }
+
+    if (event.targetKind === "protection" || event.targetKind === "obstacle") {
+      this.addPersistentDamageMark(event);
+    }
+  }
+
+  private showDurabilityDamage(
+    event: Extract<BattleEvent, { kind: "durability" }>,
+  ): void {
+    const view = this.destructibleViews.get(event.targetId);
+    this.showStoneDebris(event.x, event.y, event.amount, event.destroyed);
+    const labelX = view ? view.x + view.width / 2 : event.x;
+    const labelY = view ? view.y - 28 : event.y - 28;
+    const targetLabel =
+      event.targetKind === "protection" ? "БАШНЯ" : "ОБЪЕКТ";
+    const flash = view
+      ? this.add
+          .rectangle(
+            view.x + view.width / 2,
+            view.y + view.height / 2,
+            view.width + 12,
+            view.height + 12,
+            0xffffff,
+            0.72,
+          )
+          .setStrokeStyle(7, RETRO_UI.colors.orange, 1)
+          .setDepth(12)
+      : null;
+    const label = this.add
+      .text(
+        labelX,
+        labelY,
+        `${targetLabel}  −${event.amount}\n${event.destroyed ? "РАЗРУШЕНО" : `ПРОЧНОСТЬ ${event.remaining}`}`,
+        {
+          color: RETRO_UI.text.orange,
+          fontFamily: DISPLAY_FONT,
+          fontSize: "34px",
+          fontStyle: "bold",
+          stroke: RETRO_UI.text.ink,
+          strokeThickness: 8,
+          align: "center",
+          backgroundColor: "#17140fd9",
+          padding: { x: 14, y: 9 },
+        },
+      )
+      .setOrigin(0.5)
+      .setScale(0.72)
+      .setDepth(1100);
+
+    if (flash) {
+      this.tweens.add({
+        targets: flash,
+        alpha: 0,
+        scaleX: 1.08,
+        scaleY: 1.04,
+        duration: 260,
+        ease: "Cubic.easeOut",
+        onComplete: () => flash.destroy(),
+      });
+    }
+
+    this.tweens.add({
+      targets: label,
+      y: labelY - 82,
+      scale: 1,
+      alpha: 0,
+      duration: 1550,
+      ease: "Back.easeOut",
+      onComplete: () => label.destroy(),
+    });
+  }
+
+  private showStoneDebris(
+    x: number,
+    y: number,
+    damage: number,
+    destroyed: boolean,
+  ): void {
+    const count = destroyed ? 24 : Phaser.Math.Clamp(8 + Math.round(damage / 3), 10, 18);
+    const colors = [0xc0a781, 0x8a7a68, 0x665b50, 0x3f3934];
+
+    for (let index = 0; index < count; index += 1) {
+      const direction = index % 2 === 0 ? -1 : 1;
+      const horizontalSpeed = 55 + (index % 6) * 23 + damage * 1.4;
+      const rise = 58 + (index % 5) * 17 + (destroyed ? 46 : 0);
+      const size = (destroyed ? 10 : 7) + (index % 4) * 3;
+      const chunk = this.add
+        .rectangle(
+          x + direction * (index % 3) * 3,
+          y,
+          size,
+          Math.max(5, size - (index % 3) * 2),
+          colors[index % colors.length],
+          1,
+        )
+        .setStrokeStyle(2, 0x2d2925, 0.9)
+        .setRotation((index * 0.67) % Math.PI)
+        .setDepth(76);
+
+      this.tweens.add({
+        targets: chunk,
+        x: x + direction * horizontalSpeed,
+        angle: direction * (180 + index * 37),
+        duration: 720 + (index % 5) * 70,
+        ease: "Quad.easeOut",
+      });
+      this.tweens.add({
+        targets: chunk,
+        y: y - rise,
+        duration: 300 + (index % 4) * 38,
+        ease: "Cubic.easeOut",
+        onComplete: () => {
+          this.tweens.add({
+            targets: chunk,
+            y: y + 74 + (index % 3) * 10,
+            alpha: destroyed && index < 5 ? 0.85 : 0,
+            scale: destroyed && index < 5 ? 0.8 : 0.45,
+            duration: 560 + (index % 5) * 65,
+            ease: "Quad.easeIn",
+            onComplete: () => {
+              if (destroyed && index < 5) {
+                this.time.delayedCall(2400, () => chunk.destroy());
+              } else {
+                chunk.destroy();
+              }
+            },
+          });
+        },
+      });
+    }
+  }
+
+  private addPersistentDamageMark(
+    event: Extract<BattleEvent, { kind: "material-reaction" }>,
+  ): void {
+    if (!event.targetId) {
+      return;
+    }
+
+    const view = this.destructibleViews.get(event.targetId);
+    if (!view) {
+      return;
+    }
+
+    const mark = view.impactMarks;
+    const x = Phaser.Math.Clamp(event.x, view.x + 14, view.x + view.width - 14);
+    const y = Phaser.Math.Clamp(event.y, view.y + 18, view.y + view.height - 16);
+    const rotation = (view.impactMarkCount * 0.91) % (Math.PI * 2);
+    const size =
+      (13 + event.intensity * 8) *
+      (event.projectileType === "bomb" ? 1.55 : 1);
+    view.impactMarkCount += 1;
+
+    if (event.projectileType === "fire") {
+      mark.fillStyle(0x140b08, 0.72);
+      mark.fillCircle(x, y, size * 0.82);
+      mark.fillStyle(0x7b2f18, 0.68);
+      mark.fillCircle(x + 2, y + 1, size * 0.5);
+      mark.fillStyle(0xff7043, 0.82);
+      mark.fillCircle(x, y, Math.max(3, size * 0.16));
+      return;
+    }
+
+    if (event.projectileType === "ice") {
+      mark.lineStyle(5, 0x73dfff, 0.78);
+      for (let branch = 0; branch < 6; branch += 1) {
+        const angle = rotation + (Math.PI * 2 * branch) / 6;
+        mark.lineBetween(
+          x,
+          y,
+          x + Math.cos(angle) * size,
+          y + Math.sin(angle) * size,
+        );
+      }
+      mark.fillStyle(0xe8fbff, 0.9);
+      mark.fillTriangle(
+        x,
+        y - size * 0.55,
+        x + size * 0.35,
+        y + size * 0.25,
+        x - size * 0.28,
+        y + size * 0.2,
+      );
+      return;
+    }
+
+    const craterSize =
+      event.projectileType === "diamond" ? size * 0.52 : size * 0.68;
+    mark.fillStyle(
+      event.projectileType === "bomb" ? 0x120d0b : 0x27231f,
+      0.88,
+    );
+    mark.fillCircle(x, y, craterSize);
+    mark.lineStyle(
+      event.projectileType === "diamond" ? 3 : 4,
+      event.projectileType === "diamond" ? 0xbff6ff : 0x171411,
+      0.94,
+    );
+    const branches =
+      event.projectileType === "bomb"
+        ? 9
+        : event.projectileType === "diamond"
+          ? 7
+          : 5;
+    for (let branch = 0; branch < branches; branch += 1) {
+      const angle = rotation + (Math.PI * 2 * branch) / branches;
+      const length = size * (0.85 + (branch % 3) * 0.22);
+      const midX = x + Math.cos(angle + 0.16) * length * 0.46;
+      const midY = y + Math.sin(angle + 0.16) * length * 0.46;
+      mark.beginPath();
+      mark.moveTo(x, y);
+      mark.lineTo(midX, midY);
+      mark.lineTo(
+        x + Math.cos(angle) * length,
+        y + Math.sin(angle) * length,
+      );
+      mark.strokePath();
+    }
+    if (event.projectileType === "diamond") {
+      mark.fillStyle(0xffffff, 0.95);
+      mark.fillCircle(x, y, 4);
+    }
   }
 
   private getProjectileImpactStatus(

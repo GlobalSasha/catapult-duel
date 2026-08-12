@@ -11,7 +11,7 @@ import {
   type MatchPlacement,
 } from "./placement";
 
-export const PROTECTION_TYPES = ["wood", "net", "metal"] as const;
+export const PROTECTION_TYPES = ["castle"] as const;
 
 export type ProtectionType = (typeof PROTECTION_TYPES)[number];
 

@@ -10,6 +10,7 @@ import {
 } from "../src/game/core/projectileEffects";
 import type { ProjectileType } from "../src/game/core/projectileCatalog";
 import type { ShotResult } from "../src/game/core/shotTypes";
+import { createDefaultMatchPlacement } from "../src/game/core/placement";
 
 function directShot(
   projectileType: ProjectileType,
@@ -41,6 +42,54 @@ describe("projectile effects", () => {
       burningTurnsRemaining: 0,
       frozenTurnsRemaining: 0,
     });
+  });
+
+  it("moves a hit catapult and emits a material reaction", () => {
+    const placement = createDefaultMatchPlacement();
+    placement.left.protections = [];
+    placement.right.protections = [];
+    const initialState = createInitialBattleState(
+      undefined,
+      undefined,
+      placement,
+    );
+    Object.values(initialState.obstacles).forEach((obstacle) => {
+      obstacle.durability = 0;
+    });
+    const startX = initialState.players.right.catapultX;
+    const shot = directShot("stone", 25);
+    if (!shot.impact) {
+      throw new Error("Expected direct impact.");
+    }
+    shot.impact = {
+      ...shot.impact,
+      velocityX: 1800,
+      velocityY: 400,
+      normalImpactRatio: 0.95,
+      hitZone: "wheels",
+      impactSpeed: 1900,
+    };
+    const transition = resolveProjectileShot(initialState, shot);
+
+    expect(transition.state.players.right.catapultX).toBeGreaterThan(
+      startX,
+    );
+    expect(transition.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "material-reaction",
+          reaction: "splinter",
+          projectileType: "stone",
+          targetKind: "catapult",
+          targetId: "right",
+        }),
+        expect.objectContaining({
+          kind: "displacement",
+          targetId: "right",
+        }),
+      ]),
+    );
+    expect(initialState.players.right.catapultX).toBe(startX);
   });
 
   it("burns for two target turn endings and refreshes instead of stacking", () => {
@@ -131,6 +180,39 @@ describe("projectile effects", () => {
         targetId: "left",
         amount: 30,
         source: "explosion",
+      }),
+    );
+  });
+
+  it("anchors a bomb explosion to the confirmed impact point", () => {
+    const initialState = createInitialBattleState();
+    const target = initialState.players.right;
+    const impactX = target.catapultX;
+    const impactY =
+      target.catapultY - GAME_CONFIG.catapult.colliderHeight / 2;
+    const shot: ShotResult = {
+      projectileType: "bomb",
+      points: [{ timeMs: 300, x: 0, y: 0 }],
+      impact: {
+        targetId: "right",
+        x: impactX,
+        y: impactY,
+        impactSpeed: 700,
+        damage: 5,
+      },
+      endReason: "impact",
+    };
+    const transition = resolveProjectileShot(initialState, shot);
+
+    expect(transition.state.players.right.health).toBe(65);
+    expect(transition.events).toContainEqual(
+      expect.objectContaining({
+        kind: "damage",
+        targetId: "right",
+        amount: 30,
+        source: "explosion",
+        x: impactX,
+        y: impactY,
       }),
     );
   });

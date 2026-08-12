@@ -4,19 +4,22 @@ import type { PlayerState } from "../core/battleTypes";
 import { GAME_CONFIG } from "../core/gameConfig";
 import type { ProjectileType } from "../core/projectileCatalog";
 import { STRINGS_RU } from "../i18n/strings.ru";
+import { RETRO_UI } from "../ui/retroTheme";
 import { PROJECTILE_TEXTURE_KEYS } from "./projectileVisuals";
 
 const VIEW_COLORS = {
   left: {
-    signal: 0x9ec5ff,
+    signal: RETRO_UI.colors.playerLeft,
   },
   right: {
-    signal: 0xffb29b,
+    signal: RETRO_UI.colors.playerRight,
   },
-  healthBackground: 0x111a28,
-  health: 0x7ee2a8,
-  active: 0xffd166,
+  healthBackground: RETRO_UI.colors.ink,
+  health: RETRO_UI.colors.success,
+  active: RETRO_UI.colors.orange,
 } as const;
+
+const UI_FONT = RETRO_UI.font.ui;
 
 const CATAPULT_ART = {
   left: {
@@ -59,6 +62,8 @@ export class CatapultView extends Phaser.GameObjects.Container {
   private readonly effectAura: Phaser.GameObjects.Arc;
   private readonly effectText: Phaser.GameObjects.Text;
   private readonly bodyContainer: Phaser.GameObjects.Container;
+  private readonly damageMarks: Phaser.GameObjects.Graphics;
+  private readonly impactFlash: Phaser.GameObjects.Graphics;
   private readonly armContainer: Phaser.GameObjects.Container;
   private readonly loadedProjectile: Phaser.GameObjects.Image;
   private readonly wheelContainers: readonly Phaser.GameObjects.Container[];
@@ -125,11 +130,15 @@ export class CatapultView extends Phaser.GameObjects.Container {
       -GAME_CONFIG.catapult.visualScale,
       GAME_CONFIG.catapult.visualScale,
     );
+    this.damageMarks = new Phaser.GameObjects.Graphics(scene).setDepth(3);
+    this.impactFlash = new Phaser.GameObjects.Graphics(scene)
+      .setDepth(4)
+      .setAlpha(0);
 
     this.healthFill = new Phaser.GameObjects.Rectangle(
       scene,
       -50,
-      -142,
+      -112,
       100,
       9,
       VIEW_COLORS.health,
@@ -138,7 +147,7 @@ export class CatapultView extends Phaser.GameObjects.Container {
     const healthBackground = new Phaser.GameObjects.Rectangle(
       scene,
       0,
-      -142,
+      -112,
       108,
       17,
       VIEW_COLORS.healthBackground,
@@ -148,11 +157,11 @@ export class CatapultView extends Phaser.GameObjects.Container {
     this.healthText = new Phaser.GameObjects.Text(
       scene,
       0,
-      -163,
+      -133,
       "",
       {
-        color: "#eaf1ff",
-        fontFamily: "Arial, sans-serif",
+        color: RETRO_UI.text.primary,
+        fontFamily: UI_FONT,
         fontSize: "13px",
         fontStyle: "bold",
       },
@@ -162,12 +171,15 @@ export class CatapultView extends Phaser.GameObjects.Container {
     const playerLabel = new Phaser.GameObjects.Text(
       scene,
       0,
-      -186,
+      -155,
       displayName?.toLocaleUpperCase("ru-RU") ??
         STRINGS_RU.playerName(playerNumber),
       {
-        color: player.id === "left" ? "#9ec5ff" : "#ffb29b",
-        fontFamily: "Arial, sans-serif",
+        color:
+          player.id === "left"
+            ? RETRO_UI.text.cyan
+            : RETRO_UI.text.coral,
+        fontFamily: UI_FONT,
         fontSize: "15px",
         fontStyle: "bold",
         letterSpacing: 1,
@@ -177,11 +189,11 @@ export class CatapultView extends Phaser.GameObjects.Container {
     this.activeText = new Phaser.GameObjects.Text(
       scene,
       0,
-      -208,
+      -177,
       STRINGS_RU.activePlayer,
       {
-        color: "#ffd166",
-        fontFamily: "Arial, sans-serif",
+        color: RETRO_UI.text.orange,
+        fontFamily: UI_FONT,
         fontSize: "11px",
         fontStyle: "bold",
         letterSpacing: 1,
@@ -191,8 +203,8 @@ export class CatapultView extends Phaser.GameObjects.Container {
     this.activeOutline = new Phaser.GameObjects.Arc(
       scene,
       0,
-      -44,
-      72,
+      -34,
+      58,
       0,
       360,
       false,
@@ -203,8 +215,8 @@ export class CatapultView extends Phaser.GameObjects.Container {
     this.effectAura = new Phaser.GameObjects.Arc(
       scene,
       0,
-      -48,
-      78,
+      -36,
+      64,
       0,
       360,
       false,
@@ -215,14 +227,14 @@ export class CatapultView extends Phaser.GameObjects.Container {
     this.effectText = new Phaser.GameObjects.Text(
       scene,
       0,
-      -234,
+      -202,
       "",
       {
-        color: "#ffb08f",
-        fontFamily: "Arial, sans-serif",
+        color: RETRO_UI.text.coral,
+        fontFamily: UI_FONT,
         fontSize: "12px",
         fontStyle: "bold",
-        backgroundColor: "#111a28",
+        backgroundColor: RETRO_UI.text.ink,
         padding: { x: 8, y: 4 },
       },
     ).setOrigin(0.5);
@@ -232,6 +244,8 @@ export class CatapultView extends Phaser.GameObjects.Container {
       this.effectAura,
       shadow,
       this.bodyContainer,
+      this.damageMarks,
+      this.impactFlash,
       healthBackground,
       this.healthFill,
       this.healthText,
@@ -270,8 +284,10 @@ export class CatapultView extends Phaser.GameObjects.Container {
   ): void {
     const healthRatio = player.health / GAME_CONFIG.catapult.maxHealth;
 
+    this.setPosition(player.catapultX, player.catapultY);
     this.healthFill.setDisplaySize(100 * healthRatio, 9);
     this.healthText.setText(STRINGS_RU.health(player.health));
+    this.drawDamageMarks(healthRatio);
     this.activeText.setVisible(isActive);
     this.activeOutline.setVisible(isActive);
     this.setLoadedProjectile(
@@ -343,6 +359,32 @@ export class CatapultView extends Phaser.GameObjects.Container {
     return { x: point.x, y: point.y };
   }
 
+  /**
+   * Returns the cup position at the end of the firing swing.
+   *
+   * The body recoil is a visual effect and must not move the physics spawn
+   * point. Temporarily evaluating the release pose keeps the preview and the
+   * actual shot on the same trajectory while preserving the recoil animation.
+   */
+  getReleaseProjectileWorldPosition(): { x: number; y: number } {
+    const bodyX = this.bodyContainer.x;
+    const bodyY = this.bodyContainer.y;
+    const bodyAngle = this.bodyContainer.angle;
+    const armAngle = this.armContainer.angle;
+
+    this.bodyContainer.setPosition(0, this.getLoadedBodyY());
+    this.bodyContainer.setAngle(this.getLoadedBodyAngle());
+    this.armContainer.setAngle(this.getReleaseArmAngle());
+
+    const point = this.getLoadedProjectileWorldPosition();
+
+    this.bodyContainer.setPosition(bodyX, bodyY);
+    this.bodyContainer.setAngle(bodyAngle);
+    this.armContainer.setAngle(armAngle);
+
+    return point;
+  }
+
   playFire(
     onRelease: (launchPoint: { x: number; y: number }) => void,
   ): void {
@@ -363,7 +405,7 @@ export class CatapultView extends Phaser.GameObjects.Container {
       duration: 270,
       ease: "Cubic.easeIn",
       onComplete: () => {
-        const launchPoint = this.getLoadedProjectileWorldPosition();
+        const launchPoint = this.getReleaseProjectileWorldPosition();
         this.loadedProjectileVisibleWhenReady = false;
         this.loadedProjectile.setVisible(false);
         onRelease(launchPoint);
@@ -416,14 +458,29 @@ export class CatapultView extends Phaser.GameObjects.Container {
     });
   }
 
-  playImpact(): void {
+  playImpact(damage: number = 1): void {
     const impulseX = this.horizontalDirection * 8;
+    const intensity = Phaser.Math.Clamp(damage / 35, 0.65, 1.45);
+
+    this.impactFlash.clear();
+    this.impactFlash.fillStyle(0xffffff, 0.92);
+    this.impactFlash.fillEllipse(0, -25, 112, 86);
+    this.impactFlash.setAlpha(0.95).setScale(0.72);
+    this.scene.tweens.add({
+      targets: this.impactFlash,
+      alpha: 0,
+      scale: 1.2,
+      duration: 180,
+      ease: "Cubic.easeOut",
+    });
 
     this.scene.tweens.add({
       targets: this.bodyContainer,
-      x: impulseX,
-      angle: this.getLoadedBodyAngle() + this.horizontalDirection * 3.5,
-      duration: 85,
+      x: impulseX * intensity,
+      angle:
+        this.getLoadedBodyAngle() +
+        this.horizontalDirection * 3.5 * intensity,
+      duration: 95,
       yoyo: true,
       repeat: 2,
       ease: "Sine.easeInOut",
@@ -436,6 +493,30 @@ export class CatapultView extends Phaser.GameObjects.Container {
       yoyo: true,
       repeat: 2,
       ease: "Sine.easeInOut",
+    });
+  }
+
+  playDisplacement(
+    fromX: number,
+    fromY: number,
+    toX: number,
+    toY: number,
+  ): void {
+    this.setPosition(fromX, fromY);
+    this.wheelContainers.forEach((wheel) => {
+      this.scene.tweens.add({
+        targets: wheel,
+        angle: wheel.angle + (toX - fromX) * 2.8,
+        duration: 420,
+        ease: "Cubic.easeOut",
+      });
+    });
+    this.scene.tweens.add({
+      targets: this,
+      x: toX,
+      y: toY,
+      duration: 420,
+      ease: "Cubic.easeOut",
     });
   }
 
@@ -491,7 +572,36 @@ export class CatapultView extends Phaser.GameObjects.Container {
   getDamageLabelPosition(): { x: number; y: number } {
     return {
       x: this.x,
-      y: this.y - 222,
+      y: this.y - 205,
     };
+  }
+
+  private drawDamageMarks(healthRatio: number): void {
+    this.damageMarks.clear();
+
+    if (healthRatio >= 0.76) {
+      return;
+    }
+
+    const stage = healthRatio > 0.5 ? 1 : healthRatio > 0.25 ? 2 : 3;
+    this.damageMarks.lineStyle(3, 0x23160f, 0.96);
+    for (let index = 0; index < stage + 1; index += 1) {
+      const startX = -30 + index * 19;
+      const startY = -42 + (index % 2) * 13;
+      this.damageMarks.beginPath();
+      this.damageMarks.moveTo(startX, startY);
+      this.damageMarks.lineTo(startX + 8, startY + 9);
+      this.damageMarks.lineTo(startX + 2, startY + 19);
+      this.damageMarks.lineTo(startX + 13, startY + 27);
+      this.damageMarks.strokePath();
+    }
+
+    this.damageMarks.fillStyle(0x120d09, 0.4 + stage * 0.12);
+    this.damageMarks.fillEllipse(18, -20, 22 + stage * 6, 12 + stage * 4);
+    if (stage === 3) {
+      this.damageMarks.lineStyle(4, 0xb85b2f, 0.85);
+      this.damageMarks.lineBetween(-38, -2, -18, -14);
+      this.damageMarks.lineBetween(24, -4, 42, -18);
+    }
   }
 }

@@ -2,16 +2,38 @@
 <html lang="ru">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0b1220" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    <meta name="theme-color" content="#17140f" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <link
       rel="icon"
-      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23111a28'/%3E%3Ccircle cx='32' cy='32' r='14' fill='%237ee2a8'/%3E%3C/svg%3E"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%2317140f'/%3E%3Crect x='10' y='10' width='44' height='44' fill='%23ff941f'/%3E%3Crect x='18' y='18' width='28' height='28' fill='%232d291f'/%3E%3Crect x='27' y='23' width='10' height='18' fill='%2345d5df'/%3E%3C/svg%3E"
     />
     <title>Catapult Duel</title>
   </head>
   <body>
-    <main id="game" tabindex="0"></main>
+    <main
+      id="game"
+      tabindex="0"
+      role="application"
+      aria-describedby="game-instructions"
+    ></main>
+    <button
+      id="music-toggle"
+      type="button"
+      aria-label="Выключить музыку"
+      aria-pressed="true"
+      title="Музыка"
+    >
+      ♫
+    </button>
+    <p id="game-instructions" class="visually-hidden">
+      Управляйте игрой мышью или клавиатурой. Enter и пробел подтверждают
+      выбор, стрелки меняют параметры, Escape возвращает назад.
+    </p>
     <aside id="orientation-notice" role="status" aria-live="polite">
       <div class="orientation-card">
         <span class="orientation-icon" aria-hidden="true">↻</span>
@@ -19,6 +41,20 @@
         <span data-string="rotate-message"></span>
       </div>
     </aside>
+    <form id="mobile-name-editor" autocomplete="off">
+      <label for="mobile-name-input">Имя игрока</label>
+      <input
+        id="mobile-name-input"
+        name="player-name"
+        type="text"
+        inputmode="text"
+        maxlength="16"
+        enterkeyhint="done"
+        autocapitalize="characters"
+        spellcheck="false"
+      />
+      <button id="mobile-name-submit" type="submit">Готово</button>
+    </form>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

@@ -38,6 +38,13 @@ export type SelectProjectileErrorReason =
   | "out-of-ammo"
   | "match-finished";
 
+export type RepairErrorReason =
+  | "wrong-phase"
+  | "not-active-player"
+  | "already-used"
+  | "full-health"
+  | "match-finished";
+
 export type FireResult =
   | {
       ok: true;
@@ -55,6 +62,17 @@ export type SelectProjectileResult =
   | {
       ok: false;
       reason: SelectProjectileErrorReason;
+    };
+
+export type RepairResult =
+  | {
+      ok: true;
+      restoredHealth: number;
+      transition: BattleTransition;
+    }
+  | {
+      ok: false;
+      reason: RepairErrorReason;
     };
 
 function cloneBattleState(state: BattleState): BattleState {
@@ -187,6 +205,67 @@ export class BattleController {
     };
 
     return { ok: true };
+  }
+
+  repair(playerId: PlayerId): RepairResult {
+    if (this.state.phase === "finished") {
+      return { ok: false, reason: "match-finished" };
+    }
+
+    if (this.state.phase !== "aiming") {
+      return { ok: false, reason: "wrong-phase" };
+    }
+
+    if (playerId !== this.state.activePlayerId) {
+      return { ok: false, reason: "not-active-player" };
+    }
+
+    const player = this.state.players[playerId];
+
+    if (player.repairUsed) {
+      return { ok: false, reason: "already-used" };
+    }
+
+    if (player.health >= GAME_CONFIG.catapult.maxHealth) {
+      return { ok: false, reason: "full-health" };
+    }
+
+    const repairCapacity = Math.round(
+      GAME_CONFIG.catapult.maxHealth * GAME_CONFIG.repair.healthRatio,
+    );
+    const restoredHealth = Math.min(
+      repairCapacity,
+      GAME_CONFIG.catapult.maxHealth - player.health,
+    );
+
+    this.state = {
+      ...this.state,
+      players: {
+        ...this.state.players,
+        [playerId]: {
+          ...player,
+          health: player.health + restoredHealth,
+          repairUsed: true,
+        },
+      },
+    };
+
+    return {
+      ok: true,
+      restoredHealth,
+      transition: {
+        state: this.getState(),
+        events: [
+          {
+            kind: "repair",
+            targetId: playerId,
+            amount: restoredHealth,
+            health: player.health + restoredHealth,
+            maximumHealth: GAME_CONFIG.catapult.maxHealth,
+          },
+        ],
+      },
+    };
   }
 
   resolveShot(shot: ShotResult): BattleTransition {

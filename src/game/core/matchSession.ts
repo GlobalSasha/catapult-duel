@@ -1,4 +1,5 @@
 import type { PlayerId } from "./battleTypes";
+import { createCastlePlayerPlacement } from "./placement";
 
 export type GameMode = "ai" | "local";
 export type AiDifficulty = "easy" | "normal" | "hard";
@@ -190,28 +191,11 @@ export function recordMatchResult(
 }
 
 export function createAiPlacement(difficulty: AiDifficulty) {
-  if (difficulty === "easy") {
-    return {
-      catapultSlotIndex: 1,
-      protections: [{ type: "wood" as const, slotIndex: 2 }],
-    };
-  }
+  const catapultSlotIndex = difficulty === "hard" ? 0 : 1;
 
-  if (difficulty === "hard") {
-    return {
-      catapultSlotIndex: 0,
-      protections: [
-        { type: "metal" as const, slotIndex: 2 },
-        { type: "wood" as const, slotIndex: 3 },
-      ],
-    };
-  }
-
-  return {
-    catapultSlotIndex: 1,
-    protections: [
-      { type: "wood" as const, slotIndex: 2 },
-      { type: "net" as const, slotIndex: 3 },
-    ],
-  };
+  return createCastlePlayerPlacement(
+    "right",
+    catapultSlotIndex,
+    true,
+  );
 }

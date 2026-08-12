@@ -15,9 +15,9 @@ const PROJECTILE_NAMES: Record<ProjectileType, string> = {
 
 const PROJECTILE_DESCRIPTIONS: Record<ProjectileType, string> = {
   stone: "Универсальный удар · стабильная баллистика",
-  fire: "Поджигает цель · особенно опасен для дерева",
+  fire: "Поджигает цель · слабее против каменной башни",
   ice: "Замораживает катапульту · ограничивает силу",
-  diamond: "Точный тяжёлый удар · игнорирует 50% защиты",
+  diamond: "Точный тяжёлый удар · особенно опасен для башни",
   bomb: "Взрыв радиусом 160 · повреждает несколько целей",
 };
 
@@ -38,7 +38,7 @@ export const STRINGS_RU = {
 
     return `ВЕТЕР ${direction} ${Math.abs(wind)}`;
   },
-  menuEyebrow: "ПОШАГОВАЯ ДУЭЛЬ НА ДВОИХ",
+  menuEyebrow: "КАРТА ВОЕННОЙ КАМПАНИИ",
   menuSubtitle:
     "Выберите поле боя, рассчитайте траекторию и разрушьте катапульту соперника",
   chooseArenaTitle: "ВЫБЕРИТЕ АРЕНУ",
@@ -48,7 +48,7 @@ export const STRINGS_RU = {
   arenaCanyonName: "БАГРОВЫЙ КАНЬОН",
   arenaCanyonDescription: "Древние арки в свете раскалённого заката",
   selectedArena: "ВЫБРАНО",
-  startBattleButton: "ПЕРЕЙТИ К РАССТАНОВКЕ",
+  startBattleButton: "РАЗВЕРНУТЬ АРЕНУ",
   startBattleHint: "Кнопка, Enter или пробел",
   placementEyebrow: "ПОДГОТОВКА К БОЮ",
   placementTitle: (playerNumber: number) =>
@@ -56,18 +56,25 @@ export const STRINGS_RU = {
   placementTitleForName: (playerName: string) =>
     `РАССТАНОВКА · ${playerName.toLocaleUpperCase("ru-RU")}`,
   placementFieldHint:
-    "Расставляйте катапульту и защиту прямо на своей части поля",
+    "Выберите позицию башни: катапульта будет стоять на верхней площадке",
   placementCatapultFieldLabel: "ВЫБЕРИТЕ ПОЗИЦИЮ НА ПОЛЕ",
-  placementProtectionLabel: "ЗАЩИТА · ПЕРЕТАЩИТЕ МАТЕРИАЛ НА ПОЛЕ",
+  placementProtectionLabel: "ЗАМОК · КАТАПУЛЬТА НА ВЕРШИНЕ БАШНИ",
+  placementBuildCastle: "ПОСТРОИТЬ ЗАМОК",
+  placementCastleBuilt: "ЗАМОК ПОСТРОЕН",
+  placementRemoveCastle: "УБРАТЬ ЗАМОК",
+  placementCastleReady:
+    "Башня готова · прямые выстрелы разрушают камень, точные попадают сверху",
+  placementCastleRemoved: "Замок убран · катапульта полностью открыта",
   placementBudget: (spent: number, remaining: number) =>
-    `БЮДЖЕТ ${spent}/4 · ОСТАЛОСЬ ${remaining}`,
+    `БЮДЖЕТ ${spent}/1 · ОСТАЛОСЬ ${remaining}`,
   placementWood: "ДЕРЕВО · 1",
   placementNet: "СЕТКА · 1",
   placementMetal: "МЕТАЛЛ · 2",
   placementErase: "УБРАТЬ",
   placementReset: "СБРОСИТЬ",
   placementReady: "ГОТОВО",
-  placementRecommended: "Тяните укрытия пальцем · уже поставленные тоже двигаются",
+  placementRecommended:
+    "Башню можно разрушить или попасть по катапульте точным выстрелом сверху",
   placementDropValid: "МОЖНО ПОСТАВИТЬ",
   placementDropInvalid: "НЕЛЬЗЯ ПОСТАВИТЬ ЗДЕСЬ",
   placementErrorOverlap: "Укрытие пересекается с катапультой или другим объектом",
@@ -108,6 +115,9 @@ export const STRINGS_RU = {
       ammunition === null ? "∞" : ammunition
     }`,
   fireButton: "ОГОНЬ",
+  repairButton: "РЕМОНТ +25% · R",
+  repairUnavailableButton: "РЕМОНТ ИСПОЛЬЗОВАН",
+  repairFullHealthButton: "РЕМОНТ · HP ПОЛНОЕ",
   controlsArsenal: "АРСЕНАЛ · НАВЕДЕНИЕ · ЗАПУСК",
   aimingStatus: (turnNumber: number, playerNumber: number) =>
     `Ход ${turnNumber} · настройте угол и силу · активен Игрок ${playerNumber}`,
@@ -117,6 +127,10 @@ export const STRINGS_RU = {
     `AI рассчитывает выстрел · сложность: ${difficulty}`,
   projectileFlightStatus: "Снаряд в полёте · управление заблокировано",
   fireUnavailableStatus: "Сейчас выстрел недоступен",
+  repairStatus: (amount: number, health: number) =>
+    `Починка +${amount} HP · здоровье ${health} · ход продолжается`,
+  repairUnavailableStatus:
+    "Починка недоступна: она уже использована или здоровье полное",
   frozenPowerUnavailableStatus: "Катапульта заморожена · максимум силы 70",
   impactStatus: (damage: number) => `Попадание · урон ${damage}`,
   fireImpactStatus: (damage: number, turns: number) =>

@@ -12,19 +12,35 @@ import {
   type GameMode,
   type MatchSettings,
 } from "../core/matchSession";
-import { GAME_HEIGHT, GAME_WIDTH } from "../gameDimensions";
+import {
+  GAME_HEIGHT,
+  GAME_WIDTH,
+  IS_MOBILE_RENDER_TARGET,
+  RENDER_HEIGHT,
+  RENDER_WIDTH,
+} from "../gameDimensions";
 import { configure2KCamera, sharpenSceneText } from "../rendering";
+import { RETRO_UI } from "../ui/retroTheme";
+import { musicController } from "../audio/MusicController";
+import {
+  getOpponentDefinition,
+  isOpponentDisplayName,
+} from "../opponents/opponentCatalog";
 
 const COLORS = {
-  navy: 0x07101d,
-  panel: 0x101927,
-  panelBright: 0x172538,
-  stroke: 0x617b9e,
-  amber: 0xffd166,
-  mint: 0x7ee2a8,
-  cyan: 0x83d7ff,
-  coral: 0xff9d82,
+  navy: RETRO_UI.colors.ink,
+  panel: RETRO_UI.colors.panel,
+  panelBright: RETRO_UI.colors.panelRaised,
+  panelActive: RETRO_UI.colors.panelActive,
+  stroke: RETRO_UI.colors.border,
+  amber: RETRO_UI.colors.orange,
+  mint: RETRO_UI.colors.cyan,
+  cyan: RETRO_UI.colors.cyan,
+  coral: RETRO_UI.colors.coral,
 } as const;
+
+const DISPLAY_FONT = RETRO_UI.font.display;
+const UI_FONT = RETRO_UI.font.ui;
 
 interface TextFieldView {
   panel: Phaser.GameObjects.Rectangle;
@@ -43,6 +59,8 @@ export class HomeScene extends Phaser.Scene {
   private secondPlayerLabel!: Phaser.GameObjects.Text;
   private difficultyGroup!: Phaser.GameObjects.Container;
   private navigationStarted = false;
+  private mobileNameEditor: HTMLFormElement | null = null;
+  private mobileNameInput: HTMLInputElement | null = null;
 
   constructor() {
     super("HomeScene");
@@ -50,8 +68,14 @@ export class HomeScene extends Phaser.Scene {
 
   create(): void {
     configure2KCamera(this);
+    musicController.setTheme("menu");
     const profile = loadPlayerProfile();
     this.settings = profile.settings;
+    if (this.settings.mode === "ai") {
+      this.settings.playerNames.right = getOpponentDefinition(
+        this.settings.aiDifficulty,
+      ).displayName;
+    }
     this.navigationStarted = false;
     this.activeField = null;
     this.fields.clear();
@@ -65,10 +89,13 @@ export class HomeScene extends Phaser.Scene {
     this.drawStartButton();
     this.refresh();
     sharpenSceneText(this);
+    this.cameras.main.fadeIn(320, 8, 7, 5);
 
     this.input.keyboard?.on("keydown", this.handleKeyDown, this);
+    this.installMobileNameEditor();
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.input.keyboard?.off("keydown", this.handleKeyDown, this);
+      this.removeMobileNameEditor();
     });
   }
 
@@ -77,20 +104,34 @@ export class HomeScene extends Phaser.Scene {
       .image(0, 0, "arena-highlands")
       .setOrigin(0)
       .setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
-      .setTint(0x72809b);
+      .setTint(0xc6784f);
     this.add
-      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, COLORS.navy, 0.66)
+      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, COLORS.navy, 0.58)
       .setOrigin(0);
-    this.add
-      .rectangle(0, 0, GAME_WIDTH, 185, COLORS.navy, 0.83)
-      .setOrigin(0);
+    const atmosphere = this.add.graphics();
+    atmosphere.fillGradientStyle(
+      RETRO_UI.colors.orangeDark,
+      RETRO_UI.colors.orangeDark,
+      RETRO_UI.colors.ink,
+      RETRO_UI.colors.ink,
+      0.38,
+      0.38,
+      0.16,
+      0.16,
+    );
+    atmosphere.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    atmosphere.fillStyle(COLORS.navy, 0.86);
+    atmosphere.fillRect(0, 0, GAME_WIDTH, 184);
+    atmosphere.fillStyle(COLORS.amber, 0.9);
+    atmosphere.fillRect(0, 180, GAME_WIDTH, 4);
 
     for (let index = 0; index < 24; index += 1) {
       const mote = this.add
-        .circle(
+        .rectangle(
           40 + ((index * 173) % 1540),
           185 + ((index * 97) % 650),
-          1.5 + (index % 3),
+          3 + (index % 3) * 2,
+          3 + (index % 2) * 2,
           index % 2 === 0 ? COLORS.amber : COLORS.cyan,
           0.16 + (index % 4) * 0.04,
         )
@@ -111,8 +152,8 @@ export class HomeScene extends Phaser.Scene {
   private drawBrand(): void {
     this.add
       .text(76, 36, "ПУСТОШИ · АРТИЛЛЕРИЙСКАЯ ЛИГА", {
-        color: "#ffd166",
-        fontFamily: "Arial, sans-serif",
+        color: RETRO_UI.text.cyan,
+        fontFamily: UI_FONT,
         fontSize: "13px",
         fontStyle: "bold",
         letterSpacing: 4,
@@ -120,39 +161,44 @@ export class HomeScene extends Phaser.Scene {
       .setDepth(2);
     this.add
       .text(76, 66, "CATAPULT DUEL", {
-        color: "#f7f4ec",
-        fontFamily: "Arial, sans-serif",
+        color: RETRO_UI.text.orange,
+        fontFamily: DISPLAY_FONT,
         fontSize: "52px",
         fontStyle: "bold",
         letterSpacing: 6,
-        stroke: "#07101d",
-        strokeThickness: 7,
+        stroke: RETRO_UI.text.ink,
+        strokeThickness: 8,
       })
       .setDepth(2);
     this.add
       .text(80, 132, "Соберите бойцов, выберите противника и войдите на одну из 12 арен", {
-        color: "#b9c7db",
-        fontFamily: "Arial, sans-serif",
+        color: RETRO_UI.text.primary,
+        fontFamily: UI_FONT,
         fontSize: "16px",
       })
       .setDepth(2);
     this.add
-      .text(1518, 70, "2K", {
-        color: "#7ee2a8",
-        fontFamily: "Arial, sans-serif",
+      .text(1518, 70, IS_MOBILE_RENDER_TARGET ? "MOBILE" : "2K", {
+        color: RETRO_UI.text.cyan,
+        fontFamily: DISPLAY_FONT,
         fontSize: "30px",
         fontStyle: "bold",
       })
       .setOrigin(1, 0)
       .setDepth(2);
     this.add
-      .text(1518, 108, "2560 × 1440 · HIGH DETAIL", {
-        color: "#9fb2ce",
-        fontFamily: "Arial, sans-serif",
-        fontSize: "10px",
-        fontStyle: "bold",
-        letterSpacing: 1.2,
-      })
+      .text(
+        1518,
+        108,
+        `${RENDER_WIDTH} × ${RENDER_HEIGHT} · ${IS_MOBILE_RENDER_TARGET ? "PERFORMANCE" : "HIGH DETAIL"}`,
+        {
+          color: RETRO_UI.text.secondary,
+          fontFamily: UI_FONT,
+          fontSize: "10px",
+          fontStyle: "bold",
+          letterSpacing: 1.2,
+        },
+      )
       .setOrigin(1, 0)
       .setDepth(2);
   }
@@ -160,36 +206,40 @@ export class HomeScene extends Phaser.Scene {
   private drawSetupPanel(): void {
     const panel = this.add.graphics().setDepth(2);
     panel.fillStyle(COLORS.panel, 0.96);
-    panel.fillRoundedRect(70, 210, 950, 590, 24);
-    panel.lineStyle(2, COLORS.stroke, 0.72);
-    panel.strokeRoundedRect(70, 210, 950, 590, 24);
+    panel.fillRect(70, 210, 950, 590);
+    panel.lineStyle(6, RETRO_UI.colors.ink, 1);
+    panel.strokeRect(70, 210, 950, 590);
+    panel.lineStyle(3, COLORS.stroke, 0.9);
+    panel.strokeRect(78, 218, 934, 574);
+    panel.fillStyle(COLORS.amber, 1);
+    panel.fillRect(94, 230, 8, 44);
 
     this.add
-      .text(110, 244, "НОВАЯ ИГРА", {
-        color: "#f7f4ec",
-        fontFamily: "Arial, sans-serif",
+      .text(110, 244, "ВОЕННЫЙ СОВЕТ", {
+        color: RETRO_UI.text.orange,
+        fontFamily: DISPLAY_FONT,
         fontSize: "24px",
         fontStyle: "bold",
         letterSpacing: 3,
       })
       .setDepth(3);
     this.add
-      .text(110, 285, "РЕЖИМ БОЯ", {
-        color: "#9fb2ce",
-        fontFamily: "Arial, sans-serif",
+      .text(110, 285, "ВЫБЕРИТЕ ПРОТИВНИКА", {
+        color: RETRO_UI.text.secondary,
+        fontFamily: UI_FONT,
         fontSize: "11px",
         fontStyle: "bold",
         letterSpacing: 2,
       })
       .setDepth(3);
 
-    this.createModeButton("ai", 110, 320, 410, "ПРОТИВ AI", "Одиночная рейтинговая дуэль");
-    this.createModeButton("local", 540, 320, 410, "ДВА ИГРОКА", "По очереди на одном устройстве");
+    this.createModeButton("ai", 110, 320, 410, "ВОЕНАЧАЛЬНИК AI", "Три соперника с разной тактикой");
+    this.createModeButton("local", 540, 320, 410, "ДВА КОМАНДИРА", "По очереди на одном устройстве");
 
     this.add
       .text(110, 426, "ИМЕНА БОЙЦОВ", {
-        color: "#9fb2ce",
-        fontFamily: "Arial, sans-serif",
+        color: RETRO_UI.text.secondary,
+        fontFamily: UI_FONT,
         fontSize: "11px",
         fontStyle: "bold",
         letterSpacing: 2,
@@ -206,16 +256,16 @@ export class HomeScene extends Phaser.Scene {
 
     this.difficultyGroup = this.add.container(0, 0).setDepth(3);
     const difficultyTitle = this.add.text(110, 562, "СЛОЖНОСТЬ ПРОТИВНИКА", {
-      color: "#9fb2ce",
-      fontFamily: "Arial, sans-serif",
+      color: RETRO_UI.text.secondary,
+      fontFamily: UI_FONT,
       fontSize: "11px",
       fontStyle: "bold",
       letterSpacing: 2,
     });
     this.difficultyGroup.add(difficultyTitle);
-    this.createDifficultyButton("easy", 110, "ЛЕГКО", "Ошибается в расчётах");
-    this.createDifficultyButton("normal", 390, "НОРМАЛЬНО", "Учитывает ветер и рельеф");
-    this.createDifficultyButton("hard", 670, "СЛОЖНО", "Выбирает оружие и точную дугу");
+    this.createDifficultyButton("easy", 110);
+    this.createDifficultyButton("normal", 390);
+    this.createDifficultyButton("hard", 670);
   }
 
   private createModeButton(
@@ -234,8 +284,8 @@ export class HomeScene extends Phaser.Scene {
       .setDepth(3);
     this.add
       .text(x + 24, y + 17, title, {
-        color: "#f7f4ec",
-        fontFamily: "Arial, sans-serif",
+        color: RETRO_UI.text.primary,
+        fontFamily: UI_FONT,
         fontSize: "16px",
         fontStyle: "bold",
         letterSpacing: 1.5,
@@ -243,16 +293,18 @@ export class HomeScene extends Phaser.Scene {
       .setDepth(4);
     this.add
       .text(x + 24, y + 46, description, {
-        color: "#9fb2ce",
-        fontFamily: "Arial, sans-serif",
+        color: RETRO_UI.text.secondary,
+        fontFamily: UI_FONT,
         fontSize: "11px",
       })
       .setDepth(4);
     button.on("pointerdown", () => {
       this.settings.mode = mode;
       if (mode === "ai") {
-        this.settings.playerNames.right = "РАЗБОЙНИК AI";
-      } else if (this.settings.playerNames.right.includes("AI")) {
+        this.settings.playerNames.right = getOpponentDefinition(
+          this.settings.aiDifficulty,
+        ).displayName;
+      } else if (isOpponentDisplayName(this.settings.playerNames.right)) {
         this.settings.playerNames.right = "ИГРОК 2";
       }
       this.activeField = null;
@@ -269,23 +321,23 @@ export class HomeScene extends Phaser.Scene {
   ): Phaser.GameObjects.Text {
     const fieldLabel = this.add
       .text(x + 18, y - 18, label, {
-        color: side === "left" ? "#83d7ff" : "#ff9d82",
-        fontFamily: "Arial, sans-serif",
+        color: side === "left" ? RETRO_UI.text.cyan : RETRO_UI.text.coral,
+        fontFamily: UI_FONT,
         fontSize: "9px",
         fontStyle: "bold",
         letterSpacing: 1.2,
       })
       .setDepth(4);
     const panel = this.add
-      .rectangle(x, y, 410, 72, 0x09121f, 1)
+      .rectangle(x, y, 410, 72, RETRO_UI.colors.field, 1)
       .setOrigin(0)
       .setStrokeStyle(2, COLORS.stroke, 0.7)
       .setInteractive({ useHandCursor: true })
       .setDepth(3);
     const value = this.add
       .text(x + 20, y + 36, "", {
-        color: "#f7f4ec",
-        fontFamily: "Arial, sans-serif",
+        color: RETRO_UI.text.primary,
+        fontFamily: UI_FONT,
         fontSize: "19px",
         fontStyle: "bold",
       })
@@ -297,6 +349,7 @@ export class HomeScene extends Phaser.Scene {
       }
       this.activeField = side;
       this.refresh();
+      this.openMobileNameEditor(side);
     });
     this.fields.set(side, { panel, value, side });
     return fieldLabel;
@@ -305,30 +358,36 @@ export class HomeScene extends Phaser.Scene {
   private createDifficultyButton(
     difficulty: AiDifficulty,
     x: number,
-    title: string,
-    description: string,
   ): void {
+    const opponent = getOpponentDefinition(difficulty);
     const panel = this.add
       .rectangle(x, 600, 255, 88, COLORS.panelBright, 1)
       .setOrigin(0)
       .setStrokeStyle(2, COLORS.stroke, 0.65)
       .setInteractive({ useHandCursor: true });
-    const titleText = this.add.text(x + 18, 618, title, {
-      color: "#f7f4ec",
-      fontFamily: "Arial, sans-serif",
-      fontSize: "14px",
+    const titleText = this.add.text(x + 18, 614, opponent.displayName, {
+      color: opponent.accentTextColor,
+      fontFamily: UI_FONT,
+      fontSize: "13px",
       fontStyle: "bold",
-      letterSpacing: 1,
+      letterSpacing: 0.5,
     });
-    const detailText = this.add.text(x + 18, 648, description, {
-      color: "#91a4c0",
-      fontFamily: "Arial, sans-serif",
-      fontSize: "9px",
+    const detailText = this.add.text(
+      x + 18,
+      638,
+      `${opponent.rankLabel} · ${opponent.description}`,
+      {
+      color: RETRO_UI.text.secondary,
+      fontFamily: UI_FONT,
+      fontSize: "10px",
       wordWrap: { width: 215 },
-    });
+      lineSpacing: 2,
+      },
+    );
     this.difficultyGroup.add([panel, titleText, detailText]);
     panel.on("pointerdown", () => {
       this.settings.aiDifficulty = difficulty;
+      this.settings.playerNames.right = opponent.displayName;
       this.refresh();
     });
     this.difficultyButtons.set(difficulty, panel);
@@ -337,18 +396,22 @@ export class HomeScene extends Phaser.Scene {
   private drawRatingPanel(): void {
     const panel = this.add.graphics().setDepth(2);
     panel.fillStyle(COLORS.panel, 0.96);
-    panel.fillRoundedRect(1050, 210, 480, 590, 24);
-    panel.lineStyle(2, COLORS.stroke, 0.72);
-    panel.strokeRoundedRect(1050, 210, 480, 590, 24);
-    panel.fillStyle(COLORS.amber, 0.12);
-    panel.fillCircle(1290, 355, 112);
-    panel.lineStyle(3, COLORS.amber, 0.58);
-    panel.strokeCircle(1290, 355, 84);
+    panel.fillRect(1050, 210, 480, 590);
+    panel.lineStyle(6, RETRO_UI.colors.ink, 1);
+    panel.strokeRect(1050, 210, 480, 590);
+    panel.lineStyle(3, COLORS.stroke, 0.9);
+    panel.strokeRect(1058, 218, 464, 574);
+    panel.fillStyle(COLORS.panelActive, 1);
+    panel.fillRect(1168, 284, 244, 142);
+    panel.lineStyle(5, COLORS.amber, 1);
+    panel.strokeRect(1168, 284, 244, 142);
+    panel.lineStyle(2, RETRO_UI.colors.cyan, 0.9);
+    panel.strokeRect(1176, 292, 228, 126);
 
     this.add
       .text(1090, 245, "ДОСЬЕ БОЙЦА", {
-        color: "#f7f4ec",
-        fontFamily: "Arial, sans-serif",
+        color: RETRO_UI.text.orange,
+        fontFamily: DISPLAY_FONT,
         fontSize: "21px",
         fontStyle: "bold",
         letterSpacing: 2,
@@ -356,8 +419,8 @@ export class HomeScene extends Phaser.Scene {
       .setDepth(3);
     this.ratingText = this.add
       .text(1290, 355, "", {
-        color: "#ffd166",
-        fontFamily: "Arial, sans-serif",
+        color: RETRO_UI.text.primary,
+        fontFamily: UI_FONT,
         fontSize: "26px",
         fontStyle: "bold",
         align: "center",
@@ -366,8 +429,8 @@ export class HomeScene extends Phaser.Scene {
       .setDepth(3);
     this.add
       .text(1090, 500, "ЛОКАЛЬНЫЙ РЕЙТИНГ", {
-        color: "#9fb2ce",
-        fontFamily: "Arial, sans-serif",
+        color: RETRO_UI.text.cyan,
+        fontFamily: UI_FONT,
         fontSize: "11px",
         fontStyle: "bold",
         letterSpacing: 2,
@@ -375,8 +438,8 @@ export class HomeScene extends Phaser.Scene {
       .setDepth(3);
     this.leaderboardText = this.add
       .text(1090, 535, "", {
-        color: "#d9e3f1",
-        fontFamily: "Arial, sans-serif",
+        color: RETRO_UI.text.primary,
+        fontFamily: UI_FONT,
         fontSize: "14px",
         lineSpacing: 12,
       })
@@ -384,18 +447,19 @@ export class HomeScene extends Phaser.Scene {
   }
 
   private drawStartButton(): void {
-    const shadow = this.add
-      .rectangle(545, 752, 520, 70, 0x000000, 0.4)
-      .setDepth(2);
     const button = this.add
-      .rectangle(545, 744, 520, 70, COLORS.mint, 1)
-      .setStrokeStyle(3, 0xd6ffe8, 0.8)
+      .rectangle(545, 744, 520, 70, COLORS.amber, 1)
+      .setStrokeStyle(4, RETRO_UI.colors.ink, 1)
       .setInteractive({ useHandCursor: true })
       .setDepth(3);
     this.add
-      .text(545, 744, "ВЫБРАТЬ АРЕНУ", {
-        color: "#10221a",
-        fontFamily: "Arial, sans-serif",
+      .rectangle(545, 744, 500, 50, COLORS.amber, 1)
+      .setStrokeStyle(2, RETRO_UI.colors.cream, 0.9)
+      .setDepth(3);
+    this.add
+      .text(545, 744, "ОТКРЫТЬ КАРТУ МИРА", {
+        color: RETRO_UI.text.ink,
+        fontFamily: UI_FONT,
         fontSize: "19px",
         fontStyle: "bold",
         letterSpacing: 2,
@@ -403,12 +467,10 @@ export class HomeScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(4);
     button.on("pointerover", () => {
-      button.setScale(1.02);
-      shadow.setScale(1.02);
+      button.setFillStyle(RETRO_UI.colors.cyan, 1);
     });
     button.on("pointerout", () => {
-      button.setScale(1);
-      shadow.setScale(1);
+      button.setFillStyle(COLORS.amber, 1);
     });
     button.on("pointerdown", this.startArenaSelection, this);
   }
@@ -417,13 +479,13 @@ export class HomeScene extends Phaser.Scene {
     this.modeButtons.forEach((button, mode) => {
       const selected = this.settings.mode === mode;
       button.setStrokeStyle(selected ? 4 : 2, selected ? COLORS.amber : COLORS.stroke, selected ? 1 : 0.65);
-      button.setFillStyle(selected ? 0x3b3424 : COLORS.panelBright, 1);
+      button.setFillStyle(selected ? COLORS.panelActive : COLORS.panelBright, 1);
     });
 
     this.difficultyButtons.forEach((button, difficulty) => {
       const selected = this.settings.aiDifficulty === difficulty;
       button.setStrokeStyle(selected ? 4 : 2, selected ? COLORS.mint : COLORS.stroke, selected ? 1 : 0.65);
-      button.setFillStyle(selected ? 0x17352b : COLORS.panelBright, 1);
+      button.setFillStyle(selected ? 0x24565a : COLORS.panelBright, 1);
     });
 
     this.fields.forEach((field, side) => {
@@ -452,6 +514,10 @@ export class HomeScene extends Phaser.Scene {
   }
 
   private handleKeyDown(event: KeyboardEvent): void {
+    if (event.target instanceof HTMLElement && event.target.closest("button, input")) {
+      return;
+    }
+
     if (!this.activeField) {
       if (event.code === "Enter" || event.code === "Space") {
         event.preventDefault();
@@ -487,6 +553,119 @@ export class HomeScene extends Phaser.Scene {
     }
   }
 
+  private installMobileNameEditor(): void {
+    if (!IS_MOBILE_RENDER_TARGET) {
+      return;
+    }
+
+    this.mobileNameEditor = document.querySelector("#mobile-name-editor");
+    this.mobileNameInput = document.querySelector("#mobile-name-input");
+    this.mobileNameEditor?.addEventListener(
+      "submit",
+      this.handleMobileNameSubmit,
+    );
+    this.mobileNameInput?.addEventListener("input", this.handleMobileNameInput);
+    this.mobileNameInput?.addEventListener(
+      "keydown",
+      this.handleMobileNameKeyDown,
+    );
+    this.mobileNameInput?.addEventListener("blur", this.handleMobileNameBlur);
+  }
+
+  private removeMobileNameEditor(): void {
+    this.mobileNameEditor?.classList.remove("is-active");
+    this.mobileNameEditor?.removeEventListener(
+      "submit",
+      this.handleMobileNameSubmit,
+    );
+    this.mobileNameInput?.removeEventListener(
+      "input",
+      this.handleMobileNameInput,
+    );
+    this.mobileNameInput?.removeEventListener(
+      "keydown",
+      this.handleMobileNameKeyDown,
+    );
+    this.mobileNameInput?.removeEventListener("blur", this.handleMobileNameBlur);
+    this.mobileNameEditor = null;
+    this.mobileNameInput = null;
+  }
+
+  private openMobileNameEditor(side: "left" | "right"): void {
+    if (
+      !IS_MOBILE_RENDER_TARGET ||
+      !this.mobileNameEditor ||
+      !this.mobileNameInput
+    ) {
+      return;
+    }
+
+    this.activeField = side;
+    this.mobileNameInput.value = this.settings.playerNames[side];
+    this.mobileNameEditor.classList.add("is-active");
+    this.mobileNameInput.focus({ preventScroll: true });
+    this.mobileNameInput.setSelectionRange(
+      this.mobileNameInput.value.length,
+      this.mobileNameInput.value.length,
+    );
+  }
+
+  private finishMobileNameEditing(): void {
+    if (!this.activeField) {
+      return;
+    }
+
+    const side = this.activeField;
+    this.settings.playerNames[side] = normalizePlayerName(
+      this.settings.playerNames[side],
+      side === "left" ? "ИГРОК 1" : "ИГРОК 2",
+    );
+    this.activeField = null;
+    this.mobileNameEditor?.classList.remove("is-active");
+    this.mobileNameInput?.blur();
+    this.refresh();
+    document.querySelector<HTMLElement>("#game")?.focus({
+      preventScroll: true,
+    });
+  }
+
+  private readonly handleMobileNameInput = (event: Event): void => {
+    if (!this.activeField) {
+      return;
+    }
+
+    const input = event.currentTarget as HTMLInputElement;
+    const filtered = Array.from(input.value)
+      .filter((character) => /[A-Za-zА-Яа-яЁё0-9 _-]/.test(character))
+      .join("")
+      .slice(0, 16);
+    input.value = filtered;
+    this.settings.playerNames[this.activeField] = filtered;
+    this.refresh();
+  };
+
+  private readonly handleMobileNameKeyDown = (event: KeyboardEvent): void => {
+    event.stopPropagation();
+    if (event.key === "Enter") {
+      event.preventDefault();
+      this.finishMobileNameEditing();
+    }
+  };
+
+  private readonly handleMobileNameSubmit = (event: SubmitEvent): void => {
+    event.preventDefault();
+    event.stopPropagation();
+    this.finishMobileNameEditing();
+  };
+
+  private readonly handleMobileNameBlur = (): void => {
+    if (!this.mobileNameEditor?.classList.contains("is-active")) {
+      return;
+    }
+
+    window.setTimeout(() => this.finishMobileNameEditing(), 0);
+  };
+
   private startArenaSelection(): void {
     if (this.navigationStarted) {
       return;
@@ -496,7 +675,7 @@ export class HomeScene extends Phaser.Scene {
     this.settings.playerNames.left = normalizePlayerName(this.settings.playerNames.left, "ИГРОК 1");
     this.settings.playerNames.right =
       this.settings.mode === "ai"
-        ? "РАЗБОЙНИК AI"
+        ? getOpponentDefinition(this.settings.aiDifficulty).displayName
         : normalizePlayerName(this.settings.playerNames.right, "ИГРОК 2");
     saveMatchSettings(this.settings);
     this.registry.set(MATCH_SETTINGS_REGISTRY_KEY, this.settings);

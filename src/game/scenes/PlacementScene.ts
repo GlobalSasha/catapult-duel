@@ -13,18 +13,11 @@ import { createInitialBattleState } from "../core/createInitialBattleState";
 import { GAME_CONFIG } from "../core/gameConfig";
 import {
   cloneMatchPlacement,
+  createCastlePlayerPlacement,
   createDefaultMatchPlacement,
-  getCatapultSlotX,
-  getProtectionPlacementCenterX,
-  validatePlayerPlacement,
   type MatchPlacement,
-  type PlayerPlacement,
 } from "../core/placement";
-import {
-  getProtectionDefinition,
-  type ProtectionState,
-  type ProtectionType,
-} from "../core/protection";
+import type { ProtectionState } from "../core/protection";
 import { GAME_HEIGHT, GAME_WIDTH } from "../gameDimensions";
 import { STRINGS_RU } from "../i18n/strings.ru";
 import {
@@ -42,46 +35,39 @@ import {
 import { CatapultView } from "../views/CatapultView";
 import { createCastleAmbientEffects } from "../views/CastleAmbientEffects";
 import {
-  drawProtectionBody,
+  createCastleTowerSprite,
   PROTECTION_VIEW_COLORS,
 } from "../views/drawProtection";
+import { RETRO_UI } from "../ui/retroTheme";
+import { musicController } from "../audio/MusicController";
 
 interface PlacementSceneData {
   arenaId?: ArenaId;
 }
 
-type PlacementTool = ProtectionType | "erase";
-
-interface ProtectionDropCandidate {
-  centerX: number;
-  x: number;
-  y: number;
-  valid: boolean;
-  reason: "outside" | "overlap" | "support" | "rules" | null;
-}
-
 const COLORS = {
-  navy: 0x0e1113,
-  panel: 0x1b1f21,
-  panelStroke: 0x896448,
-  text: "#eee5d4",
-  secondary: "#b4a48c",
-  mint: 0x70b8b5,
-  amber: 0xd39245,
-  coral: 0xc56c42,
+  navy: RETRO_UI.colors.ink,
+  panel: RETRO_UI.colors.panel,
+  panelRaised: RETRO_UI.colors.panelRaised,
+  panelStroke: RETRO_UI.colors.border,
+  text: RETRO_UI.text.primary,
+  secondary: RETRO_UI.text.secondary,
+  mint: RETRO_UI.colors.cyan,
+  amber: RETRO_UI.colors.orange,
+  coral: RETRO_UI.colors.coral,
 } as const;
+
+const DISPLAY_FONT = RETRO_UI.font.display;
+const UI_FONT = RETRO_UI.font.ui;
 
 export class PlacementScene extends Phaser.Scene {
   private arenaId: ArenaId = DEFAULT_ARENA_ID;
   private currentPlayerId: PlayerId = "left";
   private draft: MatchPlacement = createDefaultMatchPlacement();
   private matchSettings: MatchSettings = readMatchSettings(undefined);
-  private selectedTool: PlacementTool = "wood";
   private dynamicObjects: Phaser.GameObjects.GameObject[] = [];
   private statusMessage: string = STRINGS_RU.placementRecommended;
-  private statusText?: Phaser.GameObjects.Text;
-  private dragPreview?: Phaser.GameObjects.Graphics;
-  private dragCandidate?: ProtectionDropCandidate;
+  private handoffContinue?: () => void;
 
   constructor() {
     super("PlacementScene");
@@ -89,6 +75,7 @@ export class PlacementScene extends Phaser.Scene {
 
   create(data: PlacementSceneData): void {
     configure2KCamera(this);
+    musicController.setTheme("placement");
     this.matchSettings = readMatchSettings(
       this.registry.get(MATCH_SETTINGS_REGISTRY_KEY),
     );
@@ -97,11 +84,12 @@ export class PlacementScene extends Phaser.Scene {
       : DEFAULT_ARENA_ID;
     this.currentPlayerId = "left";
     this.draft = createDefaultMatchPlacement();
-    this.selectedTool = "wood";
+    this.handoffContinue = undefined;
     this.statusMessage = STRINGS_RU.placementRecommended;
     this.drawBackdrop();
     this.drawPlayerSetup();
     sharpenSceneText(this);
+    this.cameras.main.fadeIn(300, 10, 8, 6);
     this.input.keyboard?.on("keydown", this.handleKeyDown, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.input.keyboard?.off("keydown", this.handleKeyDown, this);
@@ -141,8 +129,8 @@ export class PlacementScene extends Phaser.Scene {
         0,
         GAME_CONFIG.world.width,
         GAME_HEIGHT,
-        COLORS.navy,
-        0.2,
+        RETRO_UI.colors.orangeDark,
+        0.11,
       )
       .setOrigin(0)
       .setDepth(-90);
@@ -150,27 +138,27 @@ export class PlacementScene extends Phaser.Scene {
     this.drawTerrain(arena);
 
     this.add
-      .rectangle(0, 0, GAME_WIDTH, 150, 0x07101d, 0.76)
+      .rectangle(0, 0, GAME_WIDTH, 150, COLORS.navy, 0.88)
       .setOrigin(0)
       .setScrollFactor(0)
       .setDepth(900);
     this.add
-      .rectangle(0, 700, GAME_WIDTH, 200, 0x07101d, 0.93)
+      .rectangle(0, 700, GAME_WIDTH, 200, COLORS.navy, 0.96)
       .setOrigin(0)
       .setScrollFactor(0)
       .setDepth(900)
-      .setStrokeStyle(3, arena.accentColor, 0.3);
+      .setStrokeStyle(RETRO_UI.line.selected, COLORS.panelStroke, 0.88);
 
     const panelWear = this.add.graphics().setScrollFactor(0).setDepth(901);
-    panelWear.lineStyle(3, 0x9a6a45, 0.38);
+    panelWear.lineStyle(3, COLORS.amber, 0.72);
     panelWear.lineBetween(0, 154, GAME_WIDTH, 154);
     panelWear.lineBetween(0, 704, GAME_WIDTH, 704);
-    panelWear.lineStyle(2, 0x090b0c, 0.78);
+    panelWear.lineStyle(2, COLORS.navy, 0.92);
     for (let x = 22; x < GAME_WIDTH; x += 96) {
       panelWear.strokeCircle(x, 716, 4);
       panelWear.strokeCircle(x + 42, 884, 4);
     }
-    panelWear.lineStyle(5, 0xd28a42, 0.42);
+    panelWear.lineStyle(5, COLORS.amber, 0.42);
     for (let x = 0; x < GAME_WIDTH; x += 42) {
       panelWear.lineBetween(x, 700, x + 25, 713);
     }
@@ -233,10 +221,11 @@ export class PlacementScene extends Phaser.Scene {
   private drawPlayerSetup(): void {
     this.clearDynamicObjects();
     const placement = this.draft[this.currentPlayerId];
-    const validation = validatePlayerPlacement(placement);
     const arena = getArenaDefinition(this.arenaId);
     const accent =
-      this.currentPlayerId === "left" ? 0x83d7ff : COLORS.coral;
+      this.currentPlayerId === "left"
+        ? RETRO_UI.colors.playerLeft
+        : RETRO_UI.colors.playerRight;
     const battleState = createInitialBattleState(
       this.arenaId,
       GAME_CONFIG.weather.defaultMatchSeed,
@@ -253,8 +242,8 @@ export class PlacementScene extends Phaser.Scene {
     this.trackUi(
       this.add
         .text(70, 35, STRINGS_RU.placementEyebrow, {
-          color: "#ffd166",
-          fontFamily: "Arial, sans-serif",
+          color: RETRO_UI.text.cyan,
+          fontFamily: UI_FONT,
           fontSize: "13px",
           fontStyle: "bold",
           letterSpacing: 5,
@@ -270,8 +259,8 @@ export class PlacementScene extends Phaser.Scene {
             this.matchSettings.playerNames[this.currentPlayerId],
           ),
           {
-          color: COLORS.text,
-          fontFamily: "Arial, sans-serif",
+          color: RETRO_UI.text.orange,
+          fontFamily: DISPLAY_FONT,
           fontSize: "31px",
           fontStyle: "bold",
           letterSpacing: 3,
@@ -283,7 +272,7 @@ export class PlacementScene extends Phaser.Scene {
       this.add
         .text(70, 119, STRINGS_RU.placementFieldHint, {
           color: COLORS.secondary,
-          fontFamily: "Arial, sans-serif",
+          fontFamily: UI_FONT,
           fontSize: "15px",
         })
         .setOrigin(0, 0.5),
@@ -291,14 +280,14 @@ export class PlacementScene extends Phaser.Scene {
     this.trackUi(
       this.add
         .text(
-          1530,
+          GAME_WIDTH - 70,
           62,
           this.currentPlayerId === "left"
             ? STRINGS_RU.placementEnemyDirectionRight
             : STRINGS_RU.placementEnemyDirectionLeft,
           {
-            color: "#ffd166",
-            fontFamily: "Arial, sans-serif",
+            color: RETRO_UI.text.cyan,
+            fontFamily: UI_FONT,
             fontSize: "15px",
             fontStyle: "bold",
             letterSpacing: 1,
@@ -311,20 +300,20 @@ export class PlacementScene extends Phaser.Scene {
       this.add
         .text(70, 178, STRINGS_RU.placementCatapultFieldLabel, {
           color: COLORS.text,
-          fontFamily: "Arial, sans-serif",
+          fontFamily: UI_FONT,
           fontSize: "13px",
           fontStyle: "bold",
           letterSpacing: 2,
         })
         .setOrigin(0, 0.5)
-        .setBackgroundColor("rgba(7, 16, 29, 0.72)")
+        .setBackgroundColor("rgba(23, 20, 15, 0.88)")
         .setPadding(12, 7),
     );
 
     GAME_CONFIG.placement.catapultSlots[this.currentPlayerId].forEach(
       (x, slotIndex) => {
         const groundY = getTerrainHeightAt(arena.terrain, x);
-      const selected = placement.catapultSlotIndex === slotIndex;
+        const selected = placement.catapultSlotIndex === slotIndex;
         const footprint = this.track(
         this.add
             .ellipse(
@@ -336,8 +325,8 @@ export class PlacementScene extends Phaser.Scene {
               selected ? 0.22 : 0.58,
             )
             .setStrokeStyle(
-              selected ? 4 : 2,
-              selected ? COLORS.mint : accent,
+              selected ? RETRO_UI.line.selected : RETRO_UI.line.hairline,
+              selected ? COLORS.amber : accent,
               selected ? 1 : 0.7,
             )
             .setDepth(16),
@@ -348,7 +337,7 @@ export class PlacementScene extends Phaser.Scene {
             scaleX: 1.12,
             scaleY: 1.12,
             alpha: 0.45,
-            duration: 900,
+            duration: RETRO_UI.motion.ambient,
             yoyo: true,
             repeat: -1,
             ease: "Sine.easeInOut",
@@ -358,7 +347,7 @@ export class PlacementScene extends Phaser.Scene {
         this.add
             .text(x, groundY + 22, `${slotIndex + 1}`, {
             color: COLORS.text,
-            fontFamily: "Arial, sans-serif",
+            fontFamily: UI_FONT,
               fontSize: "12px",
             fontStyle: "bold",
           })
@@ -372,20 +361,26 @@ export class PlacementScene extends Phaser.Scene {
             .setDepth(40),
         );
         hitZone.on("pointerover", () =>
-          footprint.setStrokeStyle(4, COLORS.mint, 1),
+          footprint.setStrokeStyle(RETRO_UI.line.selected, COLORS.amber, 1),
         );
         hitZone.on("pointerout", () =>
           footprint.setStrokeStyle(
-            selected ? 4 : 2,
-            selected ? COLORS.mint : accent,
+            selected ? RETRO_UI.line.selected : RETRO_UI.line.hairline,
+            selected ? COLORS.amber : accent,
             selected ? 1 : 0.7,
           ),
         );
         hitZone.on("pointerdown", () => {
-        this.draft[this.currentPlayerId].catapultSlotIndex = slotIndex;
-        this.statusMessage = STRINGS_RU.placementRecommended;
-        this.drawPlayerSetup();
-      });
+          const castleEnabled =
+            this.draft[this.currentPlayerId].protections.length > 0;
+          this.draft[this.currentPlayerId] = createCastlePlayerPlacement(
+            this.currentPlayerId,
+            slotIndex,
+            castleEnabled,
+          );
+          this.statusMessage = STRINGS_RU.placementRecommended;
+          this.drawPlayerSetup();
+        });
       },
     );
 
@@ -401,7 +396,7 @@ export class PlacementScene extends Phaser.Scene {
           candidate.id.includes(`slot-${item.slotIndex}-`),
       );
       if (protection) {
-        this.drawProtectionOnField(protection, item.slotIndex);
+        this.drawProtectionOnField(protection);
       }
     });
 
@@ -409,112 +404,68 @@ export class PlacementScene extends Phaser.Scene {
       this.add
         .text(70, 725, STRINGS_RU.placementProtectionLabel, {
           color: COLORS.text,
-          fontFamily: "Arial, sans-serif",
+          fontFamily: UI_FONT,
           fontSize: "13px",
           fontStyle: "bold",
           letterSpacing: 1,
         })
         .setOrigin(0, 0.5),
     );
-    this.trackUi(
-      this.add
-        .text(
-          1530,
-          725,
-          STRINGS_RU.placementBudget(
-            validation.spentBudget,
-            validation.remainingBudget,
-          ),
-          {
-            color:
-              validation.remainingBudget >= 0 ? "#7ee2a8" : "#ff8066",
-            fontFamily: "Arial, sans-serif",
-            fontSize: "15px",
-            fontStyle: "bold",
-          },
-        )
-        .setOrigin(1, 0.5),
+    const castleEnabled = placement.protections.length > 0;
+    this.createActionButton(
+      220,
+      775,
+      300,
+      castleEnabled
+        ? STRINGS_RU.placementCastleBuilt
+        : STRINGS_RU.placementBuildCastle,
+      castleEnabled ? COLORS.mint : COLORS.panelRaised,
+      () => this.setCastleEnabled(true),
+      castleEnabled ? RETRO_UI.text.ink : RETRO_UI.text.primary,
+    );
+    this.createActionButton(
+      550,
+      775,
+      300,
+      STRINGS_RU.placementRemoveCastle,
+      COLORS.panelRaised,
+      () => this.setCastleEnabled(false),
     );
 
-    const tools: readonly {
-      type: PlacementTool;
-      label: string;
-      x: number;
-      color: number;
-    }[] = [
-      { type: "wood", label: STRINGS_RU.placementWood, x: 160, color: 0x5b4130 },
-      { type: "net", label: STRINGS_RU.placementNet, x: 370, color: 0x384247 },
-      { type: "metal", label: STRINGS_RU.placementMetal, x: 580, color: 0x4a4f52 },
-      { type: "erase", label: STRINGS_RU.placementErase, x: 790, color: 0x70463c },
-    ];
-    tools.forEach((tool) => {
-      const selected = this.selectedTool === tool.type;
-      const button = this.trackUi(
-        this.add
-          .rectangle(tool.x, 775, 188, 64, selected ? tool.color : 0x263247, selected ? 1 : 0.92)
-          .setStrokeStyle(selected ? 4 : 2, selected ? COLORS.mint : COLORS.panelStroke, selected ? 1 : 0.58)
-          .setInteractive({ useHandCursor: true }),
-      );
-      this.trackUi(
-        this.add
-          .text(
-            tool.x,
-            775,
-            tool.type === "erase" ? tool.label : `↥  ${tool.label}`,
-            {
-            color: COLORS.text,
-            fontFamily: "Arial, sans-serif",
-            fontSize: "14px",
-            fontStyle: "bold",
-            },
-          )
-          .setOrigin(0.5),
-      );
-      if (tool.type === "erase") {
-        button.on("pointerdown", () => {
-          this.selectedTool = "erase";
-          this.statusMessage = STRINGS_RU.placementRecommended;
-          this.drawPlayerSetup();
-        });
-        return;
-      }
-
-      const protectionType = tool.type;
-      this.input.setDraggable(button);
-      button.on("pointerdown", () => {
-        this.selectedTool = protectionType;
-        button.setStrokeStyle(4, COLORS.mint, 1);
-      });
-      button.on("dragstart", (pointer: Phaser.Input.Pointer) => {
-        this.beginProtectionDrag(protectionType, undefined, pointer);
-      });
-      button.on("drag", (pointer: Phaser.Input.Pointer) => {
-        this.updateProtectionDrag(protectionType, undefined, pointer);
-      });
-      button.on("dragend", (pointer: Phaser.Input.Pointer) => {
-        this.finishProtectionDrag(protectionType, undefined, pointer);
-      });
-    });
-
-    this.statusText = this.trackUi(
+    this.trackUi(
       this.add
         .text(70, 845, this.statusMessage, {
-          color: this.statusMessage === STRINGS_RU.placementRecommended ? COLORS.secondary : "#ff9b86",
-          fontFamily: "Arial, sans-serif",
+          color:
+            this.statusMessage === STRINGS_RU.placementRecommended
+              ? COLORS.secondary
+              : RETRO_UI.text.danger,
+          fontFamily: UI_FONT,
           fontSize: "14px",
+          wordWrap: { width: 990 },
         })
         .setOrigin(0, 0.5),
     );
-    this.createActionButton(1220, 820, 190, STRINGS_RU.placementReset, 0x263247, () => this.resetCurrentPlayer());
-    this.createActionButton(1430, 820, 190, STRINGS_RU.placementReady, COLORS.mint, () => this.confirmCurrentPlayer(), "#14231c");
+    this.createActionButton(
+      GAME_WIDTH - 380,
+      820,
+      190,
+      STRINGS_RU.placementReset,
+      COLORS.panelRaised,
+      () => this.resetCurrentPlayer(),
+    );
+    this.createActionButton(
+      GAME_WIDTH - 170,
+      820,
+      190,
+      STRINGS_RU.placementReady,
+      COLORS.amber,
+      () => this.confirmCurrentPlayer(),
+      RETRO_UI.text.ink,
+    );
   }
 
-  private drawProtectionOnField(
-    protection: ProtectionState,
-    slotIndex: number,
-  ): void {
-    const graphics = this.track(this.add.graphics().setDepth(22));
-    drawProtectionBody(graphics, protection);
+  private drawProtectionOnField(protection: ProtectionState): void {
+    this.track(createCastleTowerSprite(this, protection, 22));
     const glowColor = PROTECTION_VIEW_COLORS[protection.type].detail;
     const glow = this.track(
       this.add
@@ -529,52 +480,11 @@ export class PlacementScene extends Phaser.Scene {
         .setStrokeStyle(2, glowColor, 0.32)
         .setDepth(21),
     );
-    const hitZone = this.track(
-      this.add
-        .rectangle(
-          protection.x + protection.width / 2,
-          protection.y + protection.height / 2,
-          protection.width + 24,
-          protection.height + 24,
-          glowColor,
-          0.001,
-        )
-        .setInteractive({ useHandCursor: true })
-        .setDepth(44),
-    );
-    this.input.setDraggable(hitZone);
-    hitZone.on("pointerover", () => glow.setAlpha(0.2));
-    hitZone.on("pointerout", () => glow.setAlpha(0.12));
-    hitZone.on("pointerdown", () => {
-      if (this.selectedTool !== "erase") {
-        return;
-      }
-
-      this.removeProtection(slotIndex);
-    });
-    hitZone.on("dragstart", (pointer: Phaser.Input.Pointer) => {
-      if (this.selectedTool === "erase") {
-        return;
-      }
-
-      graphics.setAlpha(0.16);
-      glow.setAlpha(0.04);
-      this.beginProtectionDrag(protection.type, slotIndex, pointer);
-    });
-    hitZone.on("drag", (pointer: Phaser.Input.Pointer) => {
-      if (this.selectedTool !== "erase") {
-        this.updateProtectionDrag(protection.type, slotIndex, pointer);
-      }
-    });
-    hitZone.on("dragend", (pointer: Phaser.Input.Pointer) => {
-      if (this.selectedTool !== "erase") {
-        this.finishProtectionDrag(protection.type, slotIndex, pointer);
-      }
-    });
     this.tweens.add({
       targets: glow,
-      alpha: 0.12,
-      duration: 1100,
+      scaleX: 1.04,
+      scaleY: 1.04,
+      duration: RETRO_UI.motion.ambient,
       yoyo: true,
       repeat: -1,
       ease: "Sine.easeInOut",
@@ -587,9 +497,6 @@ export class PlacementScene extends Phaser.Scene {
       object.destroy();
     });
     this.dynamicObjects = [];
-    this.statusText = undefined;
-    this.dragPreview = undefined;
-    this.dragCandidate = undefined;
   }
 
   private track<T extends Phaser.GameObjects.GameObject>(object: T): T {
@@ -613,269 +520,62 @@ export class PlacementScene extends Phaser.Scene {
     label: string,
     color: number,
     onClick: () => void,
-    textColor: string = "#f4f7ff",
+    textColor: string = RETRO_UI.text.primary,
   ): void {
-    const button = this.trackUi(this.add.rectangle(x, y, width, 58, color, 1).setStrokeStyle(3, 0xd6e4f4, 0.65).setInteractive({ useHandCursor: true }));
-    this.trackUi(this.add.text(x, y, label, { color: textColor, fontFamily: "Arial, sans-serif", fontSize: "15px", fontStyle: "bold", letterSpacing: 1 }).setOrigin(0.5));
-    button.on("pointerover", () => button.setScale(1.03));
-    button.on("pointerout", () => button.setScale(1));
+    const button = this.trackUi(
+      this.add
+        .rectangle(x, y, width, 58, color, 1)
+        .setStrokeStyle(RETRO_UI.line.selected, COLORS.panelStroke, 0.9)
+        .setInteractive({ useHandCursor: true }),
+    );
+    this.trackUi(
+      this.add
+        .text(x, y, label, {
+          color: textColor,
+          fontFamily: UI_FONT,
+          fontSize: "15px",
+          fontStyle: "bold",
+          letterSpacing: 1,
+        })
+        .setOrigin(0.5),
+    );
+    button.on("pointerover", () =>
+      button.setStrokeStyle(
+        RETRO_UI.line.selected,
+        RETRO_UI.colors.cyan,
+        1,
+      ),
+    );
+    button.on("pointerout", () =>
+      button.setStrokeStyle(
+        RETRO_UI.line.selected,
+        COLORS.panelStroke,
+        0.9,
+      ),
+    );
     button.on("pointerdown", onClick);
   }
 
-  private beginProtectionDrag(
-    type: ProtectionType,
-    slotIndex: number | undefined,
-    pointer: Phaser.Input.Pointer,
-  ): void {
-    this.dragPreview = this.track(this.add.graphics().setDepth(63));
-    this.updateProtectionDrag(type, slotIndex, pointer);
-  }
-
-  private updateProtectionDrag(
-    type: ProtectionType,
-    slotIndex: number | undefined,
-    pointer: Phaser.Input.Pointer,
-  ): void {
-    const candidate = this.getProtectionDropCandidate(
-      type,
-      slotIndex,
-      pointer,
-    );
-    const definition = getProtectionDefinition(type);
-
-    this.dragCandidate = candidate;
-    this.dragPreview?.clear();
-    if (this.dragPreview) {
-      drawProtectionBody(this.dragPreview, {
-        type,
-        x: candidate.x,
-        y: candidate.y,
-        width: definition.width,
-        height: definition.height,
-      });
-      this.dragPreview.setAlpha(candidate.valid ? 0.92 : 0.42);
-    }
-    this.statusText
-      ?.setText(
-        candidate.valid
-          ? STRINGS_RU.placementDropValid
-          : STRINGS_RU.placementDropInvalid,
-      )
-      .setColor(candidate.valid ? "#7ee2a8" : "#ff9b86");
-  }
-
-  private finishProtectionDrag(
-    type: ProtectionType,
-    slotIndex: number | undefined,
-    pointer: Phaser.Input.Pointer,
-  ): void {
-    this.updateProtectionDrag(type, slotIndex, pointer);
-    const candidate = this.dragCandidate;
-
-    if (!candidate?.valid) {
-      this.statusMessage =
-        candidate?.reason === "overlap"
-          ? STRINGS_RU.placementErrorOverlap
-          : candidate?.reason === "support"
-            ? STRINGS_RU.placementErrorSupport
-            : candidate?.reason === "rules"
-              ? this.getPlacementRulesError(type, slotIndex)
-              : STRINGS_RU.placementDropInvalid;
-      this.drawPlayerSetup();
-      return;
-    }
-
-    const placement = this.draft[this.currentPlayerId];
-    if (slotIndex !== undefined) {
-      placement.protections = placement.protections.map((item) =>
-        item.slotIndex === slotIndex
-          ? { ...item, x: candidate.centerX }
-          : item,
-      );
-    } else {
-      const freeSlotIndex = this.getFreeProtectionSlotIndex();
-      if (freeSlotIndex === undefined) {
-        this.statusMessage = STRINGS_RU.placementErrorCount;
-        this.drawPlayerSetup();
-        return;
-      }
-      placement.protections = [
-        ...placement.protections,
-        { slotIndex: freeSlotIndex, type, x: candidate.centerX },
-      ];
-    }
-
-    this.statusMessage = STRINGS_RU.placementRecommended;
-    this.drawPlayerSetup();
-  }
-
-  private getProtectionDropCandidate(
-    type: ProtectionType,
-    slotIndex: number | undefined,
-    pointer: Phaser.Input.Pointer,
-  ): ProtectionDropCandidate {
-    const arena = getArenaDefinition(this.arenaId);
-    const definition = getProtectionDefinition(type);
-    const configuredCenters =
-      GAME_CONFIG.placement.protectionSlotCenters[this.currentPlayerId];
-    const minimumCenter = Math.min(...configuredCenters) - 70;
-    const maximumCenter = Math.max(...configuredCenters) + 70;
-    const centerX = Phaser.Math.Clamp(
-      pointer.worldX,
-      minimumCenter,
-      maximumCenter,
-    );
-    const x = centerX - definition.width / 2;
-    const groundY = getTerrainHeightAt(arena.terrain, centerX);
-    const y = groundY - definition.height;
-    const insideField =
-      pointer.y > 155 &&
-      pointer.y < 690 &&
-      pointer.worldX >= minimumCenter &&
-      pointer.worldX <= maximumCenter;
-    const leftSupportY = getTerrainHeightAt(
-      arena.terrain,
-      centerX - definition.width * 0.42,
-    );
-    const rightSupportY = getTerrainHeightAt(
-      arena.terrain,
-      centerX + definition.width * 0.42,
-    );
-    const stableSupport = Math.abs(leftSupportY - rightSupportY) <= 24;
-    const catapultX = getCatapultSlotX(
-      this.currentPlayerId,
-      this.draft[this.currentPlayerId].catapultSlotIndex,
-    );
-    const overlapsCatapult =
-      Math.abs(centerX - catapultX) < definition.width / 2 + 92;
-    const overlapsProtection = this.draft[
-      this.currentPlayerId
-    ].protections.some((item) => {
-      if (item.slotIndex === slotIndex) {
-        return false;
-      }
-      const otherDefinition = getProtectionDefinition(item.type);
-      const otherCenterX = getProtectionPlacementCenterX(
-        this.currentPlayerId,
-        item,
-      );
-      const otherGroundY = getTerrainHeightAt(
-        arena.terrain,
-        otherCenterX,
-      );
-      const otherY = otherGroundY - otherDefinition.height;
-
-      return (
-        x < otherCenterX + otherDefinition.width / 2 + 8 &&
-        x + definition.width + 8 >
-          otherCenterX - otherDefinition.width / 2 &&
-        y < otherY + otherDefinition.height &&
-        y + definition.height > otherY
-      );
-    });
-    const rulePlacement = this.createRuleCandidate(
-      type,
-      slotIndex,
-      centerX,
-    );
-    const rulesValid =
-      rulePlacement !== undefined &&
-      validatePlayerPlacement(rulePlacement).valid;
-    const reason = !insideField
-      ? "outside"
-      : !stableSupport
-        ? "support"
-        : overlapsCatapult || overlapsProtection
-          ? "overlap"
-          : !rulesValid
-            ? "rules"
-            : null;
-
-    return {
-      centerX,
-      x,
-      y,
-      valid: reason === null,
-      reason,
-    };
-  }
-
-  private createRuleCandidate(
-    type: ProtectionType,
-    slotIndex: number | undefined,
-    centerX: number,
-  ): PlayerPlacement | undefined {
-    const placement = this.draft[this.currentPlayerId];
-    if (slotIndex !== undefined) {
-      return {
-        ...placement,
-        protections: placement.protections.map((item) =>
-          item.slotIndex === slotIndex
-            ? { ...item, x: centerX }
-            : item,
-        ),
-      };
-    }
-
-    const freeSlotIndex = this.getFreeProtectionSlotIndex();
-    if (freeSlotIndex === undefined) {
-      return undefined;
-    }
-
-    return {
-      ...placement,
-      protections: [
-        ...placement.protections,
-        { slotIndex: freeSlotIndex, type, x: centerX },
-      ],
-    };
-  }
-
-  private getFreeProtectionSlotIndex(): number | undefined {
-    const used = new Set(
-      this.draft[this.currentPlayerId].protections.map(
-        ({ slotIndex }) => slotIndex,
-      ),
-    );
-
-    const freeIndex = GAME_CONFIG.placement.protectionSlotCenters[
-      this.currentPlayerId
-    ].findIndex((_, index) => !used.has(index));
-
-    return freeIndex >= 0 ? freeIndex : undefined;
-  }
-
-  private getPlacementRulesError(
-    type: ProtectionType,
-    slotIndex: number | undefined,
-  ): string {
-    const candidate = this.createRuleCandidate(type, slotIndex, 0);
-    const reason = candidate
-      ? validatePlayerPlacement(candidate).reason
-      : "too-many-protections";
-
-    return reason === "over-budget"
-      ? STRINGS_RU.placementErrorBudget
-      : reason === "too-many-metal"
-        ? STRINGS_RU.placementErrorMetal
-        : STRINGS_RU.placementErrorCount;
-  }
-
-  private removeProtection(slotIndex: number): void {
-    const placement = this.draft[this.currentPlayerId];
-    placement.protections = placement.protections.filter(
-      (item) => item.slotIndex !== slotIndex,
-    );
-    this.statusMessage = STRINGS_RU.placementRecommended;
-    this.drawPlayerSetup();
-  }
-
   private resetCurrentPlayer(): void {
-    this.draft[this.currentPlayerId] = {
-      catapultSlotIndex: 1,
-      protections: [],
-    };
+    this.draft[this.currentPlayerId] = createCastlePlayerPlacement(
+      this.currentPlayerId,
+      1,
+    );
     this.statusMessage = STRINGS_RU.placementRecommended;
+    this.drawPlayerSetup();
+  }
+
+  private setCastleEnabled(enabled: boolean): void {
+    const catapultSlotIndex =
+      this.draft[this.currentPlayerId].catapultSlotIndex;
+    this.draft[this.currentPlayerId] = createCastlePlayerPlacement(
+      this.currentPlayerId,
+      catapultSlotIndex,
+      enabled,
+    );
+    this.statusMessage = enabled
+      ? STRINGS_RU.placementCastleReady
+      : STRINGS_RU.placementCastleRemoved;
     this.drawPlayerSetup();
   }
 
@@ -903,26 +603,115 @@ export class PlacementScene extends Phaser.Scene {
   }
 
   private showHandoff(): void {
-    const cover = this.add.container(0, 0).setDepth(2000);
-    const background = this.add.rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, 0x07101d, 0.99).setOrigin(0);
-    const halo = this.add.circle(800, 390, 210, 0x263b62, 0.56).setBlendMode(Phaser.BlendModes.ADD);
-    const title = this.add.text(800, 330, STRINGS_RU.placementHandoffTitle, { color: "#ffd166", fontFamily: "Arial, sans-serif", fontSize: "34px", fontStyle: "bold", letterSpacing: 3 }).setOrigin(0.5);
-    const message = this.add.text(800, 408, STRINGS_RU.placementHandoffMessage, { color: COLORS.text, fontFamily: "Arial, sans-serif", fontSize: "19px", align: "center", wordWrap: { width: 620 } }).setOrigin(0.5);
-    const button = this.add.rectangle(800, 530, 390, 68, COLORS.mint, 1).setStrokeStyle(3, 0xd7ffe8, 0.85).setInteractive({ useHandCursor: true });
-    const label = this.add.text(800, 530, STRINGS_RU.placementHandoffButton, { color: "#14231c", fontFamily: "Arial, sans-serif", fontSize: "17px", fontStyle: "bold", letterSpacing: 1 }).setOrigin(0.5);
-    cover.add([background, halo, title, message, button, label]);
-    button.on("pointerdown", () => {
+    const centerX = GAME_WIDTH / 2;
+    const cover = this.add
+      .container(0, 0)
+      .setScrollFactor(0)
+      .setDepth(2000);
+    const background = this.add
+      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, COLORS.navy, 1)
+      .setOrigin(0)
+      .setInteractive();
+    const frame = this.add.graphics();
+    frame.fillStyle(COLORS.panel, 1);
+    frame.fillRect(centerX - 370, 220, 740, 410);
+    frame.lineStyle(RETRO_UI.line.frame, COLORS.navy, 1);
+    frame.strokeRect(centerX - 370, 220, 740, 410);
+    frame.lineStyle(RETRO_UI.line.selected, COLORS.panelStroke, 0.95);
+    frame.strokeRect(centerX - 358, 232, 716, 386);
+    frame.fillStyle(COLORS.amber, 1);
+    frame.fillRect(centerX - 330, 262, 8, 68);
+    const eyebrow = this.add
+      .text(centerX, 270, "ПЕРЕДАЧА УПРАВЛЕНИЯ", {
+        color: RETRO_UI.text.cyan,
+        fontFamily: UI_FONT,
+        fontSize: "13px",
+        fontStyle: "bold",
+        letterSpacing: 4,
+      })
+      .setOrigin(0.5);
+    const title = this.add
+      .text(centerX, 326, STRINGS_RU.placementHandoffTitle, {
+        color: RETRO_UI.text.orange,
+        fontFamily: DISPLAY_FONT,
+        fontSize: "34px",
+        fontStyle: "bold",
+        letterSpacing: 3,
+      })
+      .setOrigin(0.5);
+    const message = this.add
+      .text(centerX, 410, STRINGS_RU.placementHandoffMessage, {
+        color: COLORS.text,
+        fontFamily: UI_FONT,
+        fontSize: "19px",
+        align: "center",
+        lineSpacing: 8,
+        wordWrap: { width: 620 },
+      })
+      .setOrigin(0.5);
+    const button = this.add
+      .rectangle(centerX, 540, 390, 68, COLORS.amber, 1)
+      .setStrokeStyle(
+        RETRO_UI.line.selected,
+        RETRO_UI.colors.cream,
+        0.9,
+      )
+      .setInteractive({ useHandCursor: true });
+    const label = this.add
+      .text(centerX, 540, STRINGS_RU.placementHandoffButton, {
+        color: RETRO_UI.text.ink,
+        fontFamily: UI_FONT,
+        fontSize: "17px",
+        fontStyle: "bold",
+        letterSpacing: 1,
+      })
+      .setOrigin(0.5);
+    cover.add([background, frame, eyebrow, title, message, button, label]);
+    button.on("pointerover", () =>
+      button.setFillStyle(RETRO_UI.colors.cyan, 1),
+    );
+    button.on("pointerout", () => button.setFillStyle(COLORS.amber, 1));
+    const continuePlacement = (): void => {
       cover.destroy(true);
+      this.handoffContinue = undefined;
       this.currentPlayerId = "right";
-      this.selectedTool = "wood";
       this.statusMessage = STRINGS_RU.placementRecommended;
       this.drawPlayerSetup();
-    });
+    };
+    this.handoffContinue = continuePlacement;
+    button.on("pointerdown", continuePlacement);
   }
 
   private handleKeyDown(event: KeyboardEvent): void {
+    if (event.target instanceof HTMLElement && event.target.closest("button, input")) {
+      return;
+    }
+
+    if (event.repeat) {
+      return;
+    }
+
+    if (this.handoffContinue) {
+      if (event.code === "Enter" || event.code === "Space") {
+        event.preventDefault();
+        this.handoffContinue();
+      }
+      return;
+    }
+
     if (event.code === "Escape") {
       this.scene.start("MenuScene");
+      return;
+    }
+
+    if (event.code === "Enter" || event.code === "Space") {
+      event.preventDefault();
+      this.confirmCurrentPlayer();
+      return;
+    }
+
+    if (event.code === "KeyR") {
+      this.resetCurrentPlayer();
     }
   }
 }

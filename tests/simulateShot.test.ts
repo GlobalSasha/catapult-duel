@@ -12,6 +12,7 @@ import type {
   ShotSimulationEnvironment,
 } from "../src/game/core/shotTypes";
 import type { ProjectileType } from "../src/game/core/projectileCatalog";
+import { createDefaultMatchPlacement } from "../src/game/core/placement";
 
 const BASE_COMMAND: FireCommand = {
   playerId: "left",
@@ -26,19 +27,21 @@ const BALLISTICS_ENVIRONMENT: ShotSimulationEnvironment = {
 };
 
 const REACHABLE_SHOTS = [
-  ["stone", 20, 90],
-  ["fire", 20, 84],
-  ["ice", 20, 93],
-  ["diamond", 20, 94],
-  ["bomb", 20, 96],
+  ["stone", 22, 87],
+  ["fire", 22, 81],
+  ["ice", 22, 90],
+  ["diamond", 22, 91],
+  ["bomb", 22, 94],
 ] as const satisfies readonly (readonly [ProjectileType, number, number])[];
 
 function createCalmState() {
-  const state = createInitialBattleState();
+  const placement = createDefaultMatchPlacement();
+  placement.left.protections = [];
+  placement.right.protections = [];
+  const state = createInitialBattleState(undefined, undefined, placement);
 
   state.weather.id = "sandstorm";
   state.weather.wind = 0;
-  state.protections = [];
   return state;
 }
 
@@ -123,6 +126,167 @@ describe("calculateLaunchVelocity", () => {
 });
 
 describe("simulateShot", () => {
+  it("does not tunnel through a thin obstacle between physics samples", () => {
+    const state = createCalmState();
+    state.players.right.catapultX = 10_000;
+    const environment: ShotSimulationEnvironment = {
+      ...DEFAULT_SHOT_ENVIRONMENT,
+      stepHz: 10,
+      trajectorySampleHz: 10,
+      gravity: 0,
+      maxFlightSeconds: 0.2,
+      worldWidth: 20_000,
+      worldHeight: 10_000,
+      terrain: [
+        { x: 0, y: 9_000 },
+        { x: 20_000, y: 9_000 },
+      ],
+      obstacles: [
+        {
+          id: "thin-wall",
+          targetKind: "obstacle",
+          x: 100,
+          y: 350,
+          width: 4,
+          height: 250,
+        },
+      ],
+      outOfBoundsMargin: 1_000,
+    };
+
+    const result = simulateShot(
+      {
+        ...BASE_COMMAND,
+        angleDeg: 10,
+        power: 100,
+        launchPoint: { x: 0, y: 500 },
+      },
+      state,
+      environment,
+    );
+
+    expect(result.endReason).toBe("obstacle");
+    expect(result.objectImpact?.targetId).toBe("thin-wall");
+    expect(result.objectImpact?.x).toBeCloseTo(100, 5);
+    expect(result.objectImpact?.normalImpactRatio).toBeGreaterThan(0.9);
+  });
+
+  it("resolves the nearest swept obstacle instead of array order", () => {
+    const state = createCalmState();
+    state.players.right.catapultX = 10_000;
+    const environment: ShotSimulationEnvironment = {
+      ...DEFAULT_SHOT_ENVIRONMENT,
+      stepHz: 10,
+      trajectorySampleHz: 10,
+      gravity: 0,
+      maxFlightSeconds: 0.2,
+      worldWidth: 20_000,
+      worldHeight: 10_000,
+      terrain: [
+        { x: 0, y: 9_000 },
+        { x: 20_000, y: 9_000 },
+      ],
+      obstacles: [
+        { id: "far", x: 180, y: 350, width: 20, height: 250 },
+        { id: "near", x: 100, y: 350, width: 20, height: 250 },
+      ],
+      outOfBoundsMargin: 1_000,
+    };
+
+    const result = simulateShot(
+      {
+        ...BASE_COMMAND,
+        angleDeg: 10,
+        power: 100,
+        launchPoint: { x: 0, y: 500 },
+      },
+      state,
+      environment,
+    );
+
+    expect(result.objectImpact?.targetId).toBe("near");
+  });
+
+  it("lets a swept obstacle shield a target in the same physics step", () => {
+    const state = createCalmState();
+    state.players.right.catapultX = 200;
+    state.players.right.catapultY = 550;
+    const environment: ShotSimulationEnvironment = {
+      ...DEFAULT_SHOT_ENVIRONMENT,
+      stepHz: 10,
+      trajectorySampleHz: 10,
+      gravity: 0,
+      maxFlightSeconds: 0.2,
+      worldWidth: 2_000,
+      worldHeight: 2_000,
+      terrain: [
+        { x: 0, y: 1_900 },
+        { x: 2_000, y: 1_900 },
+      ],
+      obstacles: [
+        {
+          id: "shield",
+          targetKind: "protection",
+          x: 165,
+          y: 490,
+          width: 8,
+          height: 100,
+        },
+      ],
+      outOfBoundsMargin: 1_000,
+    };
+
+    const result = simulateShot(
+      {
+        ...BASE_COMMAND,
+        angleDeg: 10,
+        power: 100,
+        launchPoint: { x: 0, y: 560 },
+      },
+      state,
+      environment,
+    );
+
+    expect(result.endReason).toBe("obstacle");
+    expect(result.impact).toBeNull();
+    expect(result.objectImpact).toMatchObject({
+      targetKind: "protection",
+      targetId: "shield",
+    });
+  });
+
+  it("lets a precise high arc land inside the castle", () => {
+    const state = createInitialBattleState();
+    state.weather.id = "superheat";
+    state.weather.wind = 0;
+
+    const wallShot = simulateShot(
+      {
+        playerId: "left",
+        angleDeg: 18,
+        power: 96,
+        projectileType: "stone",
+      },
+      state,
+    );
+    const preciseShot = simulateShot(
+      {
+        playerId: "left",
+        angleDeg: 18,
+        power: 97,
+        projectileType: "stone",
+      },
+      state,
+    );
+
+    expect(wallShot.objectImpact).toMatchObject({
+      targetKind: "protection",
+      targetId: "right-slot-0-castle",
+    });
+    expect(preciseShot.endReason).toBe("impact");
+    expect(preciseShot.impact?.targetId).toBe("right");
+  });
+
   it("starts the trajectory at the supplied catapult cup position", () => {
     const launchPoint = { x: 712, y: 486 };
     const result = simulateShot(
@@ -149,6 +313,12 @@ describe("simulateShot", () => {
 
       expect(result.endReason).toBe("impact");
       expect(result.impact?.targetId).toBe("right");
+      expect(result.impact?.velocityX).toEqual(expect.any(Number));
+      expect(result.impact?.velocityY).toEqual(expect.any(Number));
+      expect(result.impact?.normalImpactRatio).toBeGreaterThanOrEqual(0);
+      expect(["arm", "frame", "wheels"]).toContain(
+        result.impact?.hitZone,
+      );
     },
   );
 

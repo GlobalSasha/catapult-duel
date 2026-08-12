@@ -11,6 +11,7 @@ import { createWeatherState } from "./weather";
 import {
   createArenaObstacleStates,
   createDefaultProtections,
+  getProtectionDefinition,
 } from "./protection";
 import {
   cloneMatchPlacement,
@@ -29,12 +30,17 @@ function createPlayerState(
     id,
     placement[id].catapultSlotIndex,
   );
+  const groundY = getTerrainHeightAt(arena.terrain, x);
+  const hasCastle = placement[id].protections.length > 0;
 
   return {
     id,
     health: GAME_CONFIG.catapult.maxHealth,
+    repairUsed: false,
     catapultX: x,
-    catapultY: getTerrainHeightAt(arena.terrain, x),
+    catapultY: hasCastle
+      ? groundY - getProtectionDefinition("castle").height + 8
+      : groundY,
     ammunition: createInitialAmmunition(),
     selectedProjectileType: "stone",
     effects: {

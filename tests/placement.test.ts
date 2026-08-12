@@ -4,31 +4,40 @@ import { createInitialBattleState } from "../src/game/core/createInitialBattleSt
 import { GAME_CONFIG } from "../src/game/core/gameConfig";
 import {
   cloneMatchPlacement,
+  createCastlePlayerPlacement,
   createDefaultMatchPlacement,
   isMatchPlacement,
   validatePlayerPlacement,
 } from "../src/game/core/placement";
 
 describe("pre-match placement", () => {
-  it("starts with a valid symmetric four-point preset", () => {
+  it("starts with a valid symmetric castle preset", () => {
     const placement = createDefaultMatchPlacement();
 
     expect(validatePlayerPlacement(placement.left)).toMatchObject({
       valid: true,
-      spentBudget: 4,
+      spentBudget: 1,
       remainingBudget: 0,
     });
-    expect(placement.right).toEqual(placement.left);
+    expect(placement.right.protections.map(({ type, slotIndex }) => ({
+      type,
+      slotIndex,
+    }))).toEqual(
+      placement.left.protections.map(({ type, slotIndex }) => ({
+        type,
+        slotIndex,
+      })),
+    );
     expect(isMatchPlacement(placement)).toBe(true);
   });
 
-  it("rejects duplicate slots, excess metal and excess budget", () => {
+  it("rejects duplicate and excess castle towers", () => {
     expect(
       validatePlayerPlacement({
         catapultSlotIndex: 1,
         protections: [
-          { slotIndex: 0, type: "wood" },
-          { slotIndex: 0, type: "net" },
+          { slotIndex: 0, type: "castle" },
+          { slotIndex: 0, type: "castle" },
         ],
       }).reason,
     ).toBe("duplicate-slot");
@@ -36,19 +45,9 @@ describe("pre-match placement", () => {
       validatePlayerPlacement({
         catapultSlotIndex: 1,
         protections: [
-          { slotIndex: 0, type: "metal" },
-          { slotIndex: 1, type: "metal" },
-        ],
-      }).reason,
-    ).toBe("too-many-metal");
-    expect(
-      validatePlayerPlacement({
-        catapultSlotIndex: 1,
-        protections: [
-          { slotIndex: 0, type: "metal" },
-          { slotIndex: 1, type: "wood" },
-          { slotIndex: 2, type: "net" },
-          { slotIndex: 3, type: "wood" },
+          { slotIndex: 0, type: "castle" },
+          { slotIndex: 1, type: "castle" },
+          { slotIndex: 2, type: "castle" },
         ],
       }).reason,
     ).toBe("too-many-protections");
@@ -57,10 +56,7 @@ describe("pre-match placement", () => {
   it("creates battle colliders from the chosen slots", () => {
     const placement = createDefaultMatchPlacement();
     placement.left.catapultSlotIndex = 0;
-    placement.left.protections = [
-      { slotIndex: 0, type: "metal" },
-      { slotIndex: 4, type: "wood" },
-    ];
+    placement.left = createCastlePlayerPlacement("left", 0);
     const state = createInitialBattleState(
       "highlands",
       GAME_CONFIG.weather.defaultMatchSeed,
@@ -71,22 +67,16 @@ describe("pre-match placement", () => {
     expect(state.protections).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          id: "left-slot-0-metal",
-          type: "metal",
-        }),
-        expect.objectContaining({
-          id: "left-slot-4-wood",
-          type: "wood",
+          id: "left-slot-0-castle",
+          type: "castle",
         }),
       ]),
     );
   });
 
-  it("preserves a freely dragged protection position in battle", () => {
+  it("centers the castle tower under the catapult", () => {
     const placement = createDefaultMatchPlacement();
-    placement.left.protections = [
-      { slotIndex: 0, type: "wood", x: 356 },
-    ];
+    placement.left = createCastlePlayerPlacement("left", 0);
     const state = createInitialBattleState(
       "highlands",
       GAME_CONFIG.weather.defaultMatchSeed,
@@ -97,16 +87,17 @@ describe("pre-match placement", () => {
     );
 
     expect(protection?.x).toBe(
-      356 - GAME_CONFIG.protections.wood.width / 2,
+      state.players.left.catapultX -
+        GAME_CONFIG.protections.castle.width / 2,
     );
   });
 
   it("clones both players without sharing protection arrays", () => {
     const placement = createDefaultMatchPlacement();
     const cloned = cloneMatchPlacement(placement);
-    cloned.left.protections[0]!.slotIndex = 0;
+    cloned.left.protections[0]!.slotIndex = 1;
 
-    expect(placement.left.protections[0]?.slotIndex).toBe(2);
+    expect(placement.left.protections[0]?.slotIndex).toBe(0);
     expect(cloned.left.protections).not.toBe(placement.left.protections);
   });
 });

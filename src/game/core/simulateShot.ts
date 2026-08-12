@@ -5,10 +5,11 @@ import {
   type ArenaId,
 } from "../arena/arenaCatalog";
 import {
-  circleIntersectsRectangle,
-  circleIntersectsTerrain,
+  sweepCircleAgainstRectangle,
+  sweepCircleAgainstTerrain,
+  type SweptCollision,
 } from "./collision";
-import { calculateDirectDamage } from "./damage";
+import { calculatePhysicalImpactDamage } from "./damage";
 import { GAME_CONFIG } from "./gameConfig";
 import type { ProjectileType } from "./projectileCatalog";
 import { getWeatherDefinition } from "./weather";
@@ -141,6 +142,115 @@ function getTargetPlayerId(playerId: PlayerId): PlayerId {
   return playerId === "left" ? "right" : "left";
 }
 
+function getNormalImpactRatio(
+  velocityX: number,
+  velocityY: number,
+  normalX: number,
+  normalY: number,
+): number {
+  const speed = Math.max(1, Math.hypot(velocityX, velocityY));
+
+  return Math.min(
+    1,
+    Math.abs(velocityX * normalX + velocityY * normalY) / speed,
+  );
+}
+
+type CollisionCandidate =
+  | { kind: "target"; hit: SweptCollision }
+  | {
+      kind: "object";
+      hit: SweptCollision;
+      object: ShotSimulationEnvironment["obstacles"][number];
+    }
+  | { kind: "ground"; hit: SweptCollision };
+
+const COLLISION_PRIORITY: Record<CollisionCandidate["kind"], number> = {
+  object: 0,
+  target: 1,
+  ground: 2,
+};
+
+function getFirstCollision(
+  start: FlightPoint,
+  end: FlightPoint,
+  targetRectangle: { x: number; y: number; width: number; height: number },
+  environment: ShotSimulationEnvironment,
+  ignoreLaunchOverlap: boolean,
+  highestTerrainY: number,
+): CollisionCandidate | null {
+  if (!environment.collisionsEnabled) {
+    return null;
+  }
+
+  const candidates: CollisionCandidate[] = [];
+  const targetHit = sweepCircleAgainstRectangle(
+    start,
+    end,
+    environment.projectileRadius,
+    targetRectangle,
+  );
+
+  if (targetHit) {
+    candidates.push({ kind: "target", hit: targetHit });
+  }
+
+  environment.obstacles.forEach((object) => {
+    const hit = sweepCircleAgainstRectangle(
+      start,
+      end,
+      environment.projectileRadius,
+      object,
+    );
+
+    const movementIntoSurface = hit
+      ? (end.x - start.x) * hit.normalX +
+        (end.y - start.y) * hit.normalY
+      : 0;
+    const startsInside = hit?.time === 0;
+    const allowLaunchOverlap = startsInside && ignoreLaunchOverlap;
+
+    if (
+      hit &&
+      (!allowLaunchOverlap || movementIntoSurface < -1e-6)
+    ) {
+      candidates.push({ kind: "object", hit, object });
+    }
+  });
+
+  const groundHit =
+    Math.max(start.y, end.y) + environment.projectileRadius >=
+    highestTerrainY
+      ? sweepCircleAgainstTerrain(
+          start,
+          end,
+          environment.projectileRadius,
+          environment.terrain,
+        )
+      : null;
+
+  if (groundHit) {
+    candidates.push({ kind: "ground", hit: groundHit });
+  }
+
+  return candidates.reduce<CollisionCandidate | null>(
+    (earliest, candidate) => {
+      if (!earliest) {
+        return candidate;
+      }
+
+      const timeDifference = candidate.hit.time - earliest.hit.time;
+      return timeDifference < 0 ||
+        (Math.abs(timeDifference) <= 1e-9 &&
+          COLLISION_PRIORITY[candidate.kind] <
+            COLLISION_PRIORITY[earliest.kind])
+        ? candidate
+        : earliest;
+    },
+    null,
+  );
+}
+
 export function simulateShot(
   command: FireCommand,
   state: BattleState,
@@ -196,7 +306,15 @@ export function simulateShot(
     width: resolvedEnvironment.catapultColliderWidth,
     height: resolvedEnvironment.catapultColliderHeight,
   };
+  const highestTerrainY = Math.min(
+    ...resolvedEnvironment.terrain.map(({ y: terrainY }) => terrainY),
+  );
   for (let step = 1; step <= maxSteps; step += 1) {
+    const previousPoint: FlightPoint = {
+      timeMs: (step - 1) * timeStepSeconds * MILLISECONDS_PER_SECOND,
+      x,
+      y,
+    };
     velocityX +=
       state.weather.wind *
       GAME_CONFIG.projectiles[command.projectileType].windFactor *
@@ -214,34 +332,30 @@ export function simulateShot(
       x,
       y,
     };
-    const projectileCircle = {
-      x,
-      y,
-      radius: resolvedEnvironment.projectileRadius,
-    };
-    const hitTarget =
-      resolvedEnvironment.collisionsEnabled &&
-      circleIntersectsRectangle(projectileCircle, targetRectangle);
-    const hitObject =
-      resolvedEnvironment.collisionsEnabled &&
-      resolvedEnvironment.obstacles.find((obstacle) =>
-        circleIntersectsRectangle(projectileCircle, obstacle),
-      );
-    const hitGround =
-      resolvedEnvironment.collisionsEnabled &&
-      circleIntersectsTerrain(
-        projectileCircle,
-        resolvedEnvironment.terrain,
-      );
+    const collision = getFirstCollision(
+      previousPoint,
+      point,
+      targetRectangle,
+      resolvedEnvironment,
+      step <= 2,
+      highestTerrainY,
+    );
+    if (collision) {
+      point.timeMs =
+        previousPoint.timeMs +
+        collision.hit.time * timeStepSeconds * MILLISECONDS_PER_SECOND;
+      point.x = collision.hit.centerX;
+      point.y = collision.hit.centerY;
+      x = point.x;
+      y = point.y;
+    }
     const outsideWorld = isOutsideWorld(
       point,
       resolvedEnvironment,
     );
     const shouldSavePoint =
       step % sampleEverySteps === 0 ||
-      hitTarget ||
-      hitObject ||
-      hitGround ||
+      collision !== null ||
       outsideWorld ||
       step === maxSteps;
 
@@ -249,23 +363,50 @@ export function simulateShot(
       points.push(point);
     }
 
-    if (hitTarget) {
+    if (collision?.kind === "target") {
       const impactSpeed = Math.hypot(velocityX, velocityY);
       const projectile = GAME_CONFIG.projectiles[command.projectileType];
+      const normalImpactRatio = getNormalImpactRatio(
+        velocityX,
+        velocityY,
+        collision.hit.normalX,
+        collision.hit.normalY,
+      );
+      const normalizedY = Math.min(
+        1,
+        Math.max(
+          0,
+          (collision.hit.contactY - targetRectangle.y) /
+            targetRectangle.height,
+        ),
+      );
+      const hitZone =
+        normalizedY < 0.34
+          ? "arm"
+          : normalizedY > 0.72
+            ? "wheels"
+            : "frame";
 
       return {
         projectileType: command.projectileType,
         points,
         impact: {
           targetId,
-          x,
-          y,
+          x: collision.hit.contactX,
+          y: collision.hit.contactY,
           impactSpeed,
-          damage: calculateDirectDamage({
+          velocityX,
+          velocityY,
+          normalImpactRatio,
+          hitZone,
+          damage: calculatePhysicalImpactDamage({
             baseDamage: projectile.baseDamage,
             impactSpeed,
+            relativeMass: projectile.relativeMass,
+            normalImpactRatio,
             materialCoefficient:
               GAME_CONFIG.damage.defaultMaterialCoefficient,
+            hitZone,
           }),
         },
         objectImpact: null,
@@ -273,23 +414,32 @@ export function simulateShot(
       };
     }
 
-    if (hitObject) {
+    if (collision?.kind === "object") {
+      const normalImpactRatio = getNormalImpactRatio(
+        velocityX,
+        velocityY,
+        collision.hit.normalX,
+        collision.hit.normalY,
+      );
       return {
         projectileType: command.projectileType,
         points,
         impact: null,
         objectImpact: {
-          targetKind: hitObject.targetKind ?? "obstacle",
-          targetId: hitObject.id,
-          x,
-          y,
+          targetKind: collision.object.targetKind ?? "obstacle",
+          targetId: collision.object.id,
+          x: collision.hit.contactX,
+          y: collision.hit.contactY,
           impactSpeed: Math.hypot(velocityX, velocityY),
+          velocityX,
+          velocityY,
+          normalImpactRatio,
         },
         endReason: "obstacle",
       };
     }
 
-    if (hitGround) {
+    if (collision?.kind === "ground") {
       return {
         projectileType: command.projectileType,
         points,

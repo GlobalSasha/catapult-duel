@@ -32,16 +32,19 @@ export const GAME_CONFIG = {
     initialPhase: "aiming",
     initialActivePlayerId: "left",
     initialTurnNumber: 1,
-    resultDisplayMs: 600,
+    resultDisplayMs: 1150,
     cameraPanMs: 950,
   },
   catapult: {
     maxHealth: 100,
-    visualScale: 0.82,
-    colliderWidth: 72,
-    colliderHeight: 66,
-    launchOffsetX: 28,
-    launchOffsetY: -52,
+    visualScale: 0.52,
+    colliderWidth: 62,
+    colliderHeight: 50,
+    launchOffsetX: 11,
+    launchOffsetY: -21,
+  },
+  repair: {
+    healthRatio: 0.25,
   },
   projectiles: {
     stone: {
@@ -52,6 +55,7 @@ export const GAME_CONFIG = {
       playbackScale: 1.75,
       initialAmmo: null,
       tint: 0xffffff,
+      relativeMass: 1,
     },
     fire: {
       radius: 8,
@@ -61,6 +65,7 @@ export const GAME_CONFIG = {
       playbackScale: 1.62,
       initialAmmo: 2,
       tint: 0xff7a45,
+      relativeMass: 0.72,
     },
     ice: {
       radius: 8,
@@ -70,6 +75,7 @@ export const GAME_CONFIG = {
       playbackScale: 1.82,
       initialAmmo: 2,
       tint: 0x8fe8ff,
+      relativeMass: 0.84,
     },
     diamond: {
       radius: 7,
@@ -79,6 +85,7 @@ export const GAME_CONFIG = {
       playbackScale: 1.9,
       initialAmmo: 1,
       tint: 0xb8f4ff,
+      relativeMass: 1.18,
     },
     bomb: {
       radius: 11,
@@ -88,6 +95,7 @@ export const GAME_CONFIG = {
       playbackScale: 2,
       initialAmmo: 1,
       tint: 0x6f7891,
+      relativeMass: 1.28,
     },
   },
   damage: {
@@ -95,6 +103,36 @@ export const GAME_CONFIG = {
     minImpactFactor: 0.6,
     maxImpactFactor: 1.2,
     defaultMaterialCoefficient: 1,
+    energyReferenceSpeed: 1800,
+    minimumEnergyFactor: 0.45,
+    maximumEnergyFactor: 1.55,
+    minimumIncidenceFactor: 0.5,
+    catapultHitZoneCoefficients: {
+      arm: 1.15,
+      frame: 0.82,
+      wheels: 0.95,
+    },
+  },
+  displacement: {
+    minimumImpactSpeed: 900,
+    speedToDistance: 0.018,
+    maximumDistance: 64,
+    minimumDistance: 5,
+    worldMargin: 120,
+    minimumOpponentGap: 160,
+    maximumTerrainStep: 32,
+    searchStep: 4,
+    hitZoneMobility: {
+      arm: 0.55,
+      frame: 0.82,
+      wheels: 1.2,
+    },
+    weatherMobility: {
+      superheat: 1,
+      rain: 1.12,
+      snow: 1.3,
+      sandstorm: 0.9,
+    },
   },
   projectileEffects: {
     ice: {
@@ -109,46 +147,18 @@ export const GAME_CONFIG = {
     },
   },
   protections: {
-    wood: {
+    castle: {
       cost: 1,
-      maxDurability: 30,
-      width: 70,
-      height: 92,
+      maxDurability: 100,
+      width: 140,
+      height: 260,
       firstInterceptPenalty: 0,
       damageCoefficients: {
         stone: 1,
-        fire: 1.5,
-        ice: 0.8,
-        diamond: 1.2,
-        bomb: 1,
-      },
-    },
-    net: {
-      cost: 1,
-      maxDurability: 20,
-      width: 62,
-      height: 112,
-      firstInterceptPenalty: 5,
-      damageCoefficients: {
-        stone: 0.7,
-        fire: 1,
-        ice: 0.8,
-        diamond: 1.4,
-        bomb: 1,
-      },
-    },
-    metal: {
-      cost: 2,
-      maxDurability: 55,
-      width: 58,
-      height: 124,
-      firstInterceptPenalty: 0,
-      damageCoefficients: {
-        stone: 0.6,
-        fire: 0.3,
-        ice: 0.7,
-        diamond: 1,
-        bomb: 0.8,
+        fire: 0.65,
+        ice: 0.75,
+        diamond: 1.25,
+        bomb: 1.1,
       },
     },
   },
@@ -180,12 +190,23 @@ export const GAME_CONFIG = {
       right: [4920, 4800, 4680],
     },
     protectionSlotCenters: {
-      left: [330, 400, 820, 900, 970],
-      right: [5070, 5000, 4580, 4500, 4430],
+      left: [480, 600, 720],
+      right: [4920, 4800, 4680],
     },
-    protectionBudget: 4,
-    maximumProtectionCount: 3,
-    maximumMetalCount: 1,
+    castleWallCenters: {
+      left: [
+        [480],
+        [600],
+        [720],
+      ],
+      right: [
+        [4920],
+        [4800],
+        [4680],
+      ],
+    },
+    protectionBudget: 1,
+    maximumProtectionCount: 1,
   },
   weather: {
     defaultMatchSeed: 0x7a2c_91e5,

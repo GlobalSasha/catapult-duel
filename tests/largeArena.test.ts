@@ -36,10 +36,14 @@ describe("large arenas", () => {
       const state = createInitialBattleState(arena.id);
 
       expect(state.players.left.catapultY).toBe(
-        getTerrainHeightAt(arena.terrain, arena.spawnX.left),
+        getTerrainHeightAt(arena.terrain, arena.spawnX.left) -
+          GAME_CONFIG.protections.castle.height +
+          8,
       );
       expect(state.players.right.catapultY).toBe(
-        getTerrainHeightAt(arena.terrain, arena.spawnX.right),
+        getTerrainHeightAt(arena.terrain, arena.spawnX.right) -
+          GAME_CONFIG.protections.castle.height +
+          8,
       );
     });
   });
@@ -66,7 +70,7 @@ describe("large arenas", () => {
     expect(getTerrainHeightAt(terrain, 50)).toBe(650);
     expect(
       circleIntersectsTerrain(
-        { x: 50, y: 639, radius: 10 },
+        { x: 50, y: 635, radius: 10 },
         terrain,
       ),
     ).toBe(false);

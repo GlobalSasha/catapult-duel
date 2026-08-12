@@ -19,6 +19,32 @@ export interface TerrainPoint {
 
 export type ArenaObstacleKind = "fortress" | "rock";
 
+export type ArenaObstacleTextureKey =
+  | "map-highlands-watchtower"
+  | "map-highlands-ruined-gate"
+  | "map-canyon-broken-arch"
+  | "map-canyon-obelisk"
+  | "map-glacier-ice-bastion"
+  | "map-glacier-frozen-drill"
+  | "map-moon-crashed-lander"
+  | "map-moon-drill-rig"
+  | "map-volcano-lava-pump"
+  | "map-volcano-collapsed-foundry"
+  | "map-neon-crashed-skimmer"
+  | "map-neon-relay-tower"
+  | "map-temple-flooded-shrine"
+  | "map-temple-broken-aqueduct"
+  | "map-desert-crashed-airship"
+  | "map-desert-cargo-module"
+  | "map-forest-root-watchtower"
+  | "map-forest-ruined-chapel"
+  | "map-clockwork-boiler-tower"
+  | "map-clockwork-mechanical-crane"
+  | "map-toxic-damaged-reactor"
+  | "map-toxic-pipe-station"
+  | "map-storm-ruined-lighthouse"
+  | "map-storm-wrecked-ship";
+
 export interface ArenaCollisionPart {
   offsetX: number;
   offsetY: number;
@@ -34,6 +60,8 @@ export interface ArenaObstacle {
   width: number;
   height: number;
   collisionParts: readonly ArenaCollisionPart[];
+  textureKey?: ArenaObstacleTextureKey;
+  flipX?: boolean;
 }
 
 export interface ArenaPalette {
@@ -142,40 +170,44 @@ export const ARENAS: readonly ArenaDefinition[] = [
       {
         id: "highlands-left-watch",
         kind: "fortress",
-        x: 1560,
-        y: 420,
-        width: 120,
-        height: 180,
+        x: 1550,
+        y: 419,
+        width: 140,
+        height: 181,
+        textureKey: "map-highlands-watchtower",
         collisionParts: [
-          { offsetX: 0, offsetY: 0, width: 120, height: 180 },
-          { offsetX: 0, offsetY: -18, width: 30, height: 24 },
-          { offsetX: 60, offsetY: -18, width: 30, height: 24 },
+          { offsetX: 20, offsetY: 0, width: 100, height: 181 },
+          { offsetX: 0, offsetY: 0, width: 140, height: 52 },
+          { offsetX: 0, offsetY: 110, width: 30, height: 71 },
         ],
       },
       {
         id: "highlands-center-ridge",
         kind: "rock",
-        x: 2580,
-        y: 620,
-        width: 240,
-        height: 130,
+        x: 2585,
+        y: 570,
+        width: 230,
+        height: 180,
+        textureKey: "map-highlands-ruined-gate",
         collisionParts: [
-          { offsetX: 24, offsetY: 24, width: 54, height: 106 },
-          { offsetX: 78, offsetY: 0, width: 84, height: 130 },
-          { offsetX: 162, offsetY: 20, width: 54, height: 110 },
+          { offsetX: 8, offsetY: 20, width: 70, height: 160 },
+          { offsetX: 78, offsetY: 0, width: 74, height: 74 },
+          { offsetX: 152, offsetY: 22, width: 70, height: 158 },
         ],
       },
       {
         id: "highlands-right-watch",
         kind: "fortress",
-        x: 3680,
-        y: 430,
-        width: 120,
-        height: 180,
+        x: 3670,
+        y: 429,
+        width: 140,
+        height: 181,
+        textureKey: "map-highlands-watchtower",
+        flipX: true,
         collisionParts: [
-          { offsetX: 0, offsetY: 0, width: 120, height: 180 },
-          { offsetX: 0, offsetY: -18, width: 30, height: 24 },
-          { offsetX: 60, offsetY: -18, width: 30, height: 24 },
+          { offsetX: 20, offsetY: 0, width: 100, height: 181 },
+          { offsetX: 0, offsetY: 0, width: 140, height: 52 },
+          { offsetX: 110, offsetY: 110, width: 30, height: 71 },
         ],
       },
     ],
@@ -228,6 +260,7 @@ export const ARENAS: readonly ArenaDefinition[] = [
         y: 480,
         width: 110,
         height: 210,
+        textureKey: "map-canyon-obelisk",
         collisionParts: [
           { offsetX: 18, offsetY: 24, width: 24, height: 186 },
           { offsetX: 42, offsetY: 0, width: 32, height: 210 },
@@ -241,6 +274,7 @@ export const ARENAS: readonly ArenaDefinition[] = [
         y: 365,
         width: 105,
         height: 170,
+        textureKey: "map-canyon-broken-arch",
         collisionParts: [
           { offsetX: 0, offsetY: 0, width: 105, height: 170 },
           { offsetX: 0, offsetY: -18, width: 26.25, height: 24 },
@@ -254,6 +288,8 @@ export const ARENAS: readonly ArenaDefinition[] = [
         y: 365,
         width: 105,
         height: 170,
+        textureKey: "map-canyon-broken-arch",
+        flipX: true,
         collisionParts: [
           { offsetX: 0, offsetY: 0, width: 105, height: 170 },
           { offsetX: 0, offsetY: -18, width: 26.25, height: 24 },
@@ -267,6 +303,8 @@ export const ARENAS: readonly ArenaDefinition[] = [
         y: 510,
         width: 110,
         height: 210,
+        textureKey: "map-canyon-obelisk",
+        flipX: true,
         collisionParts: [
           { offsetX: 18, offsetY: 24, width: 24, height: 186 },
           { offsetX: 42, offsetY: 0, width: 32, height: 210 },
@@ -316,9 +354,9 @@ export const ARENAS: readonly ArenaDefinition[] = [
       { x: 5400, y: 600 },
     ],
     obstacles: [
-      createRockObstacle("glacier-left-needle", 1530, 545, 125, 205),
-      createRockObstacle("glacier-crevasse-spine", 2660, 735, 190, 120),
-      createFortressObstacle("glacier-right-bastion", 3630, 555, 130, 190),
+      { ...createRockObstacle("glacier-left-needle", 1530, 545, 125, 205), textureKey: "map-glacier-frozen-drill" as const },
+      { ...createRockObstacle("glacier-crevasse-spine", 2660, 735, 190, 120), textureKey: "map-glacier-ice-bastion" as const },
+      { ...createFortressObstacle("glacier-right-bastion", 3630, 555, 130, 190), textureKey: "map-glacier-frozen-drill" as const, flipX: true },
     ],
     spawnX: { left: 600, right: 4800 },
     palette: {
@@ -359,9 +397,19 @@ export const ARENAS: readonly ArenaDefinition[] = [
       { x: 5400, y: 760 },
     ],
     obstacles: [
-      createFortressObstacle("volcano-left-refinery", 1420, 655, 135, 185),
-      createRockObstacle("volcano-crater-plug", 2640, 465, 220, 155),
-      createRockObstacle("volcano-right-stack", 3750, 620, 125, 210),
+      {
+        ...createFortressObstacle("volcano-left-refinery", 1395, 655, 190, 165),
+        textureKey: "map-volcano-lava-pump" as const,
+      },
+      {
+        ...createRockObstacle("volcano-crater-plug", 2645, 465, 205, 178),
+        textureKey: "map-volcano-lava-pump" as const,
+        flipX: true,
+      },
+      {
+        ...createRockObstacle("volcano-right-stack", 3740, 620, 142, 210),
+        textureKey: "map-volcano-collapsed-foundry" as const,
+      },
     ],
     spawnX: { left: 600, right: 4800 },
     palette: {
@@ -402,9 +450,9 @@ export const ARENAS: readonly ArenaDefinition[] = [
       { x: 5400, y: 700 },
     ],
     obstacles: [
-      createFortressObstacle("neon-left-tower", 1510, 590, 105, 220),
-      createFortressObstacle("neon-center-pier", 2580, 575, 150, 150),
-      createFortressObstacle("neon-right-tower", 3740, 605, 105, 220),
+      { ...createFortressObstacle("neon-left-tower", 1510, 590, 105, 220), textureKey: "map-neon-relay-tower" as const },
+      { ...createFortressObstacle("neon-center-pier", 2580, 575, 150, 150), textureKey: "map-neon-crashed-skimmer" as const },
+      { ...createFortressObstacle("neon-right-tower", 3740, 605, 105, 220), textureKey: "map-neon-relay-tower" as const, flipX: true },
     ],
     spawnX: { left: 600, right: 4800 },
     palette: {
@@ -445,9 +493,9 @@ export const ARENAS: readonly ArenaDefinition[] = [
       { x: 5400, y: 760 },
     ],
     obstacles: [
-      createRockObstacle("temple-left-idol", 1490, 700, 135, 185),
-      createFortressObstacle("temple-center-shrine", 2610, 615, 145, 175),
-      createRockObstacle("temple-right-idol", 3800, 665, 135, 185),
+      { ...createRockObstacle("temple-left-idol", 1490, 700, 135, 185), textureKey: "map-temple-broken-aqueduct" as const },
+      { ...createFortressObstacle("temple-center-shrine", 2610, 615, 145, 175), textureKey: "map-temple-flooded-shrine" as const },
+      { ...createRockObstacle("temple-right-idol", 3800, 665, 135, 185), textureKey: "map-temple-broken-aqueduct" as const, flipX: true },
     ],
     spawnX: { left: 600, right: 4800 },
     palette: {
@@ -488,9 +536,9 @@ export const ARENAS: readonly ArenaDefinition[] = [
       { x: 5400, y: 730 },
     ],
     obstacles: [
-      createRockObstacle("desert-left-wreck", 1510, 595, 210, 125),
-      createRockObstacle("desert-basin-bones", 2660, 775, 180, 105),
-      createFortressObstacle("desert-salvage-tower", 3810, 570, 115, 160),
+      { ...createRockObstacle("desert-left-wreck", 1510, 595, 210, 125), textureKey: "map-desert-crashed-airship" as const },
+      { ...createRockObstacle("desert-basin-bones", 2660, 775, 180, 105), textureKey: "map-desert-cargo-module" as const },
+      { ...createFortressObstacle("desert-salvage-tower", 3810, 570, 115, 160), textureKey: "map-desert-crashed-airship" as const, flipX: true },
     ],
     spawnX: { left: 600, right: 4800 },
     palette: {
@@ -531,9 +579,9 @@ export const ARENAS: readonly ArenaDefinition[] = [
       { x: 5400, y: 650 },
     ],
     obstacles: [
-      createRockObstacle("forest-left-root", 1490, 590, 190, 150),
-      createFortressObstacle("forest-ruined-keep", 2600, 640, 130, 190),
-      createRockObstacle("forest-right-root", 3790, 595, 190, 150),
+      { ...createRockObstacle("forest-left-root", 1490, 590, 190, 150), textureKey: "map-forest-root-watchtower" as const },
+      { ...createFortressObstacle("forest-ruined-keep", 2600, 640, 130, 190), textureKey: "map-forest-ruined-chapel" as const },
+      { ...createRockObstacle("forest-right-root", 3790, 595, 190, 150), textureKey: "map-forest-root-watchtower" as const, flipX: true },
     ],
     spawnX: { left: 600, right: 4800 },
     palette: {
@@ -574,9 +622,9 @@ export const ARENAS: readonly ArenaDefinition[] = [
       { x: 5400, y: 760 },
     ],
     obstacles: [
-      createFortressObstacle("clockwork-left-gearhouse", 1500, 675, 150, 175),
-      createFortressObstacle("clockwork-center-bridge", 2520, 555, 210, 130),
-      createRockObstacle("clockwork-right-flywheel", 3800, 610, 170, 170),
+      { ...createFortressObstacle("clockwork-left-gearhouse", 1500, 675, 150, 175), textureKey: "map-clockwork-boiler-tower" as const },
+      { ...createFortressObstacle("clockwork-center-bridge", 2520, 555, 210, 130), textureKey: "map-clockwork-mechanical-crane" as const },
+      { ...createRockObstacle("clockwork-right-flywheel", 3800, 610, 170, 170), textureKey: "map-clockwork-boiler-tower" as const, flipX: true },
     ],
     spawnX: { left: 600, right: 4800 },
     palette: {
@@ -617,9 +665,19 @@ export const ARENAS: readonly ArenaDefinition[] = [
       { x: 5400, y: 690 },
     ],
     obstacles: [
-      createFortressObstacle("moon-left-rig", 1480, 625, 110, 215),
-      createRockObstacle("moon-crater-boulder", 2660, 785, 180, 130),
-      createFortressObstacle("moon-right-dome", 3790, 625, 155, 145),
+      {
+        ...createFortressObstacle("moon-left-rig", 1460, 625, 150, 216),
+        textureKey: "map-moon-drill-rig" as const,
+      },
+      {
+        ...createRockObstacle("moon-crater-boulder", 2660, 785, 180, 133),
+        textureKey: "map-moon-crashed-lander" as const,
+      },
+      {
+        ...createFortressObstacle("moon-right-dome", 3775, 625, 180, 133),
+        textureKey: "map-moon-crashed-lander" as const,
+        flipX: true,
+      },
     ],
     spawnX: { left: 600, right: 4800 },
     palette: {
@@ -660,9 +718,9 @@ export const ARENAS: readonly ArenaDefinition[] = [
       { x: 5400, y: 730 },
     ],
     obstacles: [
-      createFortressObstacle("toxic-left-vat", 1490, 690, 130, 180),
-      createRockObstacle("toxic-center-island", 2660, 720, 220, 110),
-      createFortressObstacle("toxic-right-vat", 3780, 710, 130, 180),
+      { ...createFortressObstacle("toxic-left-vat", 1490, 690, 130, 180), textureKey: "map-toxic-damaged-reactor" as const },
+      { ...createRockObstacle("toxic-center-island", 2660, 720, 220, 110), textureKey: "map-toxic-pipe-station" as const },
+      { ...createFortressObstacle("toxic-right-vat", 3780, 710, 130, 180), textureKey: "map-toxic-damaged-reactor" as const, flipX: true },
     ],
     spawnX: { left: 600, right: 4800 },
     palette: {
@@ -703,9 +761,9 @@ export const ARENAS: readonly ArenaDefinition[] = [
       { x: 5400, y: 620 },
     ],
     obstacles: [
-      createFortressObstacle("storm-left-watch", 1480, 625, 120, 200),
-      createRockObstacle("storm-ravine-wreck", 2660, 825, 190, 120),
-      createFortressObstacle("storm-right-lighthouse", 3770, 625, 115, 225),
+      { ...createFortressObstacle("storm-left-watch", 1480, 625, 120, 200), textureKey: "map-storm-ruined-lighthouse" as const },
+      { ...createRockObstacle("storm-ravine-wreck", 2660, 825, 190, 120), textureKey: "map-storm-wrecked-ship" as const },
+      { ...createFortressObstacle("storm-right-lighthouse", 3770, 625, 115, 225), textureKey: "map-storm-ruined-lighthouse" as const, flipX: true },
     ],
     spawnX: { left: 600, right: 4800 },
     palette: {

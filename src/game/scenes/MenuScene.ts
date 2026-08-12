@@ -15,17 +15,22 @@ import {
   type MatchSettings,
 } from "../core/matchSession";
 import { configure2KCamera, sharpenSceneText } from "../rendering";
+import { RETRO_UI } from "../ui/retroTheme";
+import { musicController } from "../audio/MusicController";
 
 const COLORS = {
-  navy: 0x0b1220,
-  panel: 0x101927,
-  panelStroke: 0x7188a9,
-  amber: 0xffd166,
-  mint: 0x7ee2a8,
-  primaryText: "#f7f4ec",
-  secondaryText: "#b9c7db",
-  buttonText: "#14231c",
+  navy: RETRO_UI.colors.ink,
+  panel: RETRO_UI.colors.panel,
+  panelStroke: RETRO_UI.colors.border,
+  amber: RETRO_UI.colors.orange,
+  mint: RETRO_UI.colors.cyan,
+  primaryText: RETRO_UI.text.primary,
+  secondaryText: RETRO_UI.text.secondary,
+  buttonText: RETRO_UI.text.ink,
 } as const;
+
+const DISPLAY_FONT = RETRO_UI.font.display;
+const UI_FONT = RETRO_UI.font.ui;
 
 interface ArenaCard {
   border: Phaser.GameObjects.Rectangle;
@@ -45,6 +50,7 @@ export class MenuScene extends Phaser.Scene {
 
   create(): void {
     configure2KCamera(this);
+    musicController.setTheme("menu");
     this.matchSettings = readMatchSettings(
       this.registry.get(MATCH_SETTINGS_REGISTRY_KEY),
     );
@@ -56,14 +62,27 @@ export class MenuScene extends Phaser.Scene {
       .image(0, 0, getArenaDefinition(this.selectedArenaId).textureKey)
       .setOrigin(0)
       .setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
-      .setTint(0x6b7890);
+      .setTint(0xc77953);
 
     this.add
-      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, COLORS.navy, 0.5)
+      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, COLORS.navy, 0.54)
       .setOrigin(0);
+    const atmosphere = this.add.graphics();
+    atmosphere.fillGradientStyle(
+      RETRO_UI.colors.orangeDark,
+      RETRO_UI.colors.orangeDark,
+      RETRO_UI.colors.ink,
+      RETRO_UI.colors.ink,
+      0.28,
+      0.28,
+      0.12,
+      0.12,
+    );
+    atmosphere.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
     this.add
-      .rectangle(0, 0, GAME_WIDTH, 172, COLORS.navy, 0.8)
+      .rectangle(0, 0, GAME_WIDTH, 172, COLORS.navy, 0.9)
       .setOrigin(0);
+    this.add.rectangle(0, 168, GAME_WIDTH, 4, COLORS.amber, 0.9).setOrigin(0);
 
     this.drawHeader();
     this.drawNavigation();
@@ -71,6 +90,7 @@ export class MenuScene extends Phaser.Scene {
     this.drawStartButton();
     this.refreshSelection();
     sharpenSceneText(this);
+    this.cameras.main.fadeIn(300, 8, 7, 5);
 
     this.input.keyboard?.on("keydown", this.handleKeyDown, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -81,8 +101,8 @@ export class MenuScene extends Phaser.Scene {
   private drawHeader(): void {
     this.add
       .text(GAME_WIDTH / 2, 18, STRINGS_RU.menuEyebrow, {
-        color: "#ffd166",
-        fontFamily: "Arial, sans-serif",
+        color: RETRO_UI.text.cyan,
+        fontFamily: UI_FONT,
         fontSize: "12px",
         fontStyle: "bold",
         letterSpacing: 4,
@@ -91,20 +111,20 @@ export class MenuScene extends Phaser.Scene {
 
     this.add
       .text(GAME_WIDTH / 2, 42, STRINGS_RU.gameTitle, {
-        color: COLORS.primaryText,
-        fontFamily: "Arial, sans-serif",
+        color: RETRO_UI.text.orange,
+        fontFamily: DISPLAY_FONT,
         fontSize: "38px",
         fontStyle: "bold",
         letterSpacing: 5,
-        stroke: "#0b1220",
-        strokeThickness: 6,
+        stroke: RETRO_UI.text.ink,
+        strokeThickness: 8,
       })
       .setOrigin(0.5, 0);
 
     this.add
       .text(GAME_WIDTH / 2, 92, STRINGS_RU.chooseArenaTitle, {
         color: COLORS.primaryText,
-        fontFamily: "Arial, sans-serif",
+        fontFamily: DISPLAY_FONT,
         fontSize: "18px",
         fontStyle: "bold",
         letterSpacing: 3,
@@ -114,15 +134,15 @@ export class MenuScene extends Phaser.Scene {
     this.add
       .text(GAME_WIDTH / 2, 124, STRINGS_RU.chooseArenaHint, {
         color: COLORS.secondaryText,
-        fontFamily: "Arial, sans-serif",
+        fontFamily: UI_FONT,
         fontSize: "13px",
       })
       .setOrigin(0.5, 0);
 
     this.add
       .text(GAME_WIDTH / 2, 151, "ДЕНЬ · ЗАКАТ · СУМЕРКИ · НОЧЬ · 12 РАЗНЫХ РЕЛЬЕФОВ", {
-        color: "#f0d18b",
-        fontFamily: "Arial, sans-serif",
+        color: RETRO_UI.text.cyan,
+        fontFamily: UI_FONT,
         fontSize: "10px",
         fontStyle: "bold",
         letterSpacing: 2,
@@ -133,12 +153,12 @@ export class MenuScene extends Phaser.Scene {
   private drawNavigation(): void {
     const back = this.add
       .rectangle(92, 74, 134, 44, COLORS.panel, 0.96)
-      .setStrokeStyle(2, COLORS.panelStroke, 0.75)
+      .setStrokeStyle(3, RETRO_UI.colors.cyan, 0.9)
       .setInteractive({ useHandCursor: true });
     this.add
       .text(92, 74, "←  МЕНЮ", {
         color: COLORS.primaryText,
-        fontFamily: "Arial, sans-serif",
+        fontFamily: UI_FONT,
         fontSize: "11px",
         fontStyle: "bold",
         letterSpacing: 1,
@@ -146,12 +166,12 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0.5);
     const modeLabel =
       this.matchSettings.mode === "ai"
-        ? `ПРОТИВ AI · ${STRINGS_RU.aiDifficultyName(this.matchSettings.aiDifficulty)}`
+        ? `ПРОТИВ ${this.matchSettings.playerNames.right} · ${STRINGS_RU.aiDifficultyName(this.matchSettings.aiDifficulty)}`
         : "ДВА ИГРОКА";
     this.add
       .text(1510, 61, `${this.matchSettings.playerNames.left}\n${modeLabel}`, {
-        color: "#d8e4f2",
-        fontFamily: "Arial, sans-serif",
+        color: RETRO_UI.text.primary,
+        fontFamily: UI_FONT,
         fontSize: "11px",
         fontStyle: "bold",
         align: "right",
@@ -173,27 +193,23 @@ export class MenuScene extends Phaser.Scene {
     const x = 236 + column * 376;
     const y = 267 + row * 190;
 
-    this.add
-      .rectangle(x + 6, y + 8, 344, 174, 0x000000, 0.42)
-      .setOrigin(0.5);
-
     const border = this.add
       .rectangle(x, y, 344, 174, COLORS.panel, 0.98)
-      .setStrokeStyle(2, COLORS.panelStroke, 0.7)
+      .setStrokeStyle(3, COLORS.panelStroke, 0.85)
       .setInteractive({ useHandCursor: true });
 
     this.add
       .image(x, y - 27, arena.textureKey)
-      .setDisplaySize(332, 112);
+      .setDisplaySize(328, 108);
 
     this.add
-      .rectangle(x, y + 49, 332, 56, COLORS.panel, 0.97)
+      .rectangle(x, y + 49, 328, 56, COLORS.panel, 0.98)
       .setOrigin(0.5);
 
     this.add
       .text(x - 154, y + 28, arena.displayName, {
         color: arena.accentTextColor,
-        fontFamily: "Arial, sans-serif",
+        fontFamily: UI_FONT,
         fontSize: "12px",
         fontStyle: "bold",
         letterSpacing: 0.6,
@@ -203,18 +219,18 @@ export class MenuScene extends Phaser.Scene {
     this.add
       .text(x - 154, y + 50, arena.description, {
         color: COLORS.secondaryText,
-        fontFamily: "Arial, sans-serif",
-        fontSize: "9px",
+        fontFamily: UI_FONT,
+        fontSize: "10px",
       })
       .setOrigin(0, 0.5);
 
     const timeBackground = this.add
-      .rectangle(0, 0, 126, 22, 0x111723, 0.9)
-      .setStrokeStyle(1, arena.accentColor, 0.85);
+      .rectangle(0, 0, 126, 22, RETRO_UI.colors.inkSoft, 0.96)
+      .setStrokeStyle(2, RETRO_UI.colors.cyan, 0.9);
     const timeText = this.add
       .text(0, 0, arena.timeLabel, {
         color: arena.accentTextColor,
-        fontFamily: "Arial, sans-serif",
+        fontFamily: UI_FONT,
         fontSize: "8px",
         fontStyle: "bold",
         letterSpacing: 0.7,
@@ -224,11 +240,11 @@ export class MenuScene extends Phaser.Scene {
 
     const badgeBackground = this.add
       .rectangle(0, 0, 92, 23, COLORS.amber, 1)
-      .setStrokeStyle(1, 0xffe7a6, 0.9);
+      .setStrokeStyle(2, RETRO_UI.colors.cream, 0.9);
     const badgeText = this.add
       .text(0, 0, STRINGS_RU.selectedArena, {
-        color: "#2a2517",
-        fontFamily: "Arial, sans-serif",
+        color: RETRO_UI.text.ink,
+        fontFamily: UI_FONT,
         fontSize: "8px",
         fontStyle: "bold",
         letterSpacing: 0.6,
@@ -244,7 +260,7 @@ export class MenuScene extends Phaser.Scene {
     });
     border.on("pointerover", () => {
       if (arena.id !== this.selectedArenaId) {
-        border.setStrokeStyle(4, arena.accentColor, 0.9);
+        border.setStrokeStyle(4, RETRO_UI.colors.cyan, 0.9);
       }
     });
     border.on("pointerout", () => {
@@ -255,17 +271,9 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private drawStartButton(): void {
-    const shadow = this.add.rectangle(
-      GAME_WIDTH / 2 + 6,
-      845,
-      326,
-      52,
-      0x000000,
-      0.42,
-    );
     const button = this.add
-      .rectangle(GAME_WIDTH / 2, 839, 326, 52, COLORS.mint, 1)
-      .setStrokeStyle(2, 0xd4ffe6, 0.9);
+      .rectangle(GAME_WIDTH / 2, 839, 326, 52, COLORS.amber, 1)
+      .setStrokeStyle(4, RETRO_UI.colors.ink, 1);
     const hitZone = this.add
       .rectangle(GAME_WIDTH / 2, 839, 356, 72, 0xffffff, 0.001)
       .setInteractive({ useHandCursor: true });
@@ -273,7 +281,7 @@ export class MenuScene extends Phaser.Scene {
     this.add
       .text(GAME_WIDTH / 2, 839, STRINGS_RU.startBattleButton, {
         color: COLORS.buttonText,
-        fontFamily: "Arial, sans-serif",
+        fontFamily: UI_FONT,
         fontSize: "16px",
         fontStyle: "bold",
         letterSpacing: 1.5,
@@ -281,17 +289,19 @@ export class MenuScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     hitZone.on("pointerover", () => {
-      button.setScale(1.025);
-      shadow.setScale(1.025);
+      button.setFillStyle(RETRO_UI.colors.cyan, 1);
     });
     hitZone.on("pointerout", () => {
-      button.setScale(1);
-      shadow.setScale(1);
+      button.setFillStyle(COLORS.amber, 1);
     });
     hitZone.on("pointerdown", this.startBattle, this);
   }
 
   private handleKeyDown(event: KeyboardEvent): void {
+    if (event.target instanceof HTMLElement && event.target.closest("button, input")) {
+      return;
+    }
+
     if (event.repeat) {
       return;
     }
@@ -355,11 +365,9 @@ export class MenuScene extends Phaser.Scene {
     this.background.setTexture(arena.textureKey);
     this.cards.forEach((card, id) => {
       const selected = id === this.selectedArenaId;
-      const cardArena = getArenaDefinition(id);
-
       card.border.setStrokeStyle(
-        selected ? 5 : 2,
-        selected ? cardArena.accentColor : COLORS.panelStroke,
+        selected ? 5 : 3,
+        selected ? RETRO_UI.colors.cyan : COLORS.panelStroke,
         selected ? 1 : 0.7,
       );
       card.badge.setVisible(selected);
@@ -376,7 +384,7 @@ export class MenuScene extends Phaser.Scene {
     this.cameras.main.once(
       Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE,
       () => {
-        this.scene.start("PlacementScene", {
+        this.scene.start("ArenaLoadingScene", {
           arenaId: this.selectedArenaId,
         });
       },
