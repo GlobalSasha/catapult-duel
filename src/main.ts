@@ -1,6 +1,10 @@
 import * as Phaser from "phaser";
 
-import { RENDER_HEIGHT, RENDER_WIDTH } from "./game/gameDimensions";
+import {
+  IS_MOBILE_RENDER_TARGET,
+  RENDER_HEIGHT,
+  RENDER_WIDTH,
+} from "./game/gameDimensions";
 import { musicController } from "./game/audio/MusicController";
 import { STRINGS_RU } from "./game/i18n/strings.ru";
 import { BattleScene } from "./game/scenes/BattleScene";
@@ -23,6 +27,7 @@ const fullscreenHint = document.querySelector<HTMLElement>("#fullscreen-hint");
 const fullscreenHintClose = document.querySelector<HTMLButtonElement>(
   "#fullscreen-hint-close",
 );
+let fullscreenHintTimer: number | undefined;
 
 interface WebkitDocument extends Document {
   webkitFullscreenElement?: Element | null;
@@ -45,6 +50,9 @@ const isFullscreen = (): boolean =>
 
 const updateFullscreenButton = (): void => {
   const active = isFullscreen();
+  if (active) {
+    fullscreenHint?.classList.remove("is-visible");
+  }
   fullscreenToggle?.classList.toggle("is-active", active);
   fullscreenToggle?.setAttribute(
     "aria-label",
@@ -54,6 +62,26 @@ const updateFullscreenButton = (): void => {
   if (label) {
     label.textContent = active ? "ВЫЙТИ" : "ВЕСЬ ЭКРАН";
   }
+};
+
+const hideFullscreenHint = (): void => {
+  if (fullscreenHintTimer !== undefined) {
+    window.clearTimeout(fullscreenHintTimer);
+    fullscreenHintTimer = undefined;
+  }
+  fullscreenHint?.classList.remove("is-visible");
+};
+
+const showFullscreenHint = (): void => {
+  if (!fullscreenHint) {
+    return;
+  }
+
+  fullscreenHint.classList.add("is-visible");
+  if (fullscreenHintTimer !== undefined) {
+    window.clearTimeout(fullscreenHintTimer);
+  }
+  fullscreenHintTimer = window.setTimeout(hideFullscreenHint, 4200);
 };
 
 const tryLockLandscape = async (): Promise<void> => {
@@ -89,10 +117,10 @@ const toggleFullscreen = async (): Promise<void> => {
       await fullscreenTarget.webkitRequestFullscreen();
       await tryLockLandscape();
     } else {
-      fullscreenHint?.classList.add("is-visible");
+      showFullscreenHint();
     }
   } catch {
-    fullscreenHint?.classList.add("is-visible");
+    showFullscreenHint();
   } finally {
     updateFullscreenButton();
   }
@@ -129,10 +157,20 @@ fullscreenToggle?.addEventListener("click", (event) => {
   void toggleFullscreen();
 });
 fullscreenHintClose?.addEventListener("click", () => {
-  fullscreenHint?.classList.remove("is-visible");
+  hideFullscreenHint();
 });
-document.addEventListener("fullscreenchange", updateFullscreenButton);
-document.addEventListener("webkitfullscreenchange", updateFullscreenButton);
+document.addEventListener("fullscreenchange", () => {
+  updateFullscreenButton();
+  if (isFullscreen()) {
+    hideFullscreenHint();
+  }
+});
+document.addEventListener("webkitfullscreenchange", () => {
+  updateFullscreenButton();
+  if (isFullscreen()) {
+    hideFullscreenHint();
+  }
+});
 updateFullscreenButton();
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -151,7 +189,9 @@ const config: Phaser.Types.Core.GameConfig = {
     ResultScene,
   ],
   scale: {
-    mode: Phaser.Scale.FIT,
+    mode: IS_MOBILE_RENDER_TARGET
+      ? Phaser.Scale.RESIZE
+      : Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
     autoRound: true,
     width: RENDER_WIDTH,

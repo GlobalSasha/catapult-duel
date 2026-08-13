@@ -88,7 +88,7 @@ export class AimingControls extends Phaser.GameObjects.Container {
     this.callbacks = callbacks;
 
     const dockSpecs = [
-      { x: 326, width: 594 },
+      { x: 350, width: 650 },
       { x: 948, width: 590 },
       { x: 1424, width: 232 },
     ] as const;
@@ -152,16 +152,16 @@ export class AimingControls extends Phaser.GameObjects.Container {
         this.createProjectileButton(
           scene,
           projectileType,
-          88 + index * 116,
+          92 + index * 126,
           848,
         ),
     );
 
     const projectileDetailPanel = new Phaser.GameObjects.Rectangle(
       scene,
-      326,
+      350,
       752,
-      594,
+      650,
       66,
       RETRO_UI.colors.ink,
       0.94,
@@ -443,6 +443,20 @@ export class AimingControls extends Phaser.GameObjects.Container {
     this.updateSliderVisual(this.powerSlider, this.power);
   }
 
+  setAimValues(angleDeg: number, power: number): void {
+    this.angleDeg = Phaser.Math.Clamp(
+      Math.round(angleDeg),
+      GAME_CONFIG.aiming.minAngleDeg,
+      GAME_CONFIG.aiming.maxAngleDeg,
+    );
+    this.power = Phaser.Math.Clamp(
+      Math.round(power),
+      GAME_CONFIG.aiming.minPower,
+      this.powerSlider.maximum,
+    );
+    this.notifyChange();
+  }
+
   private notifyChange(): void {
     this.angleSlider.label.setText(STRINGS_RU.angleLabel(this.angleDeg));
     this.powerSlider.label.setText(this.getPowerLabel());
@@ -461,8 +475,8 @@ export class AimingControls extends Phaser.GameObjects.Container {
       scene,
       x,
       y,
-      104,
-      68,
+      120,
+      82,
       COLORS.track,
       0.96,
     ).setStrokeStyle(2, COLORS.panelStroke, 0.55);
@@ -470,18 +484,18 @@ export class AimingControls extends Phaser.GameObjects.Container {
       scene,
       projectileType,
       x,
-      y - 11,
+      y - 13,
     );
     const label = new Phaser.GameObjects.Text(
       scene,
       x,
-      y + 22,
+      y + 28,
       this.getProjectileCardLabel(projectileType),
       {
         align: "center",
         color: COLORS.text,
         fontFamily: UI_FONT,
-        fontSize: "8px",
+        fontSize: "9px",
         fontStyle: "bold",
         letterSpacing: 0.5,
       },
@@ -490,8 +504,8 @@ export class AimingControls extends Phaser.GameObjects.Container {
       scene,
       x,
       y,
-      112,
-      78,
+      132,
+      96,
       0xffffff,
       0.001,
     )
@@ -606,7 +620,7 @@ export class AimingControls extends Phaser.GameObjects.Container {
       x,
       y,
       PROJECTILE_TEXTURE_KEYS[projectileType],
-    ).setDisplaySize(36, 36);
+    ).setDisplaySize(48, 48);
   }
 
   private createSlider(options: {

@@ -576,6 +576,13 @@ export class CatapultView extends Phaser.GameObjects.Container {
     };
   }
 
+  getAimAnchorWorldPosition(): { x: number; y: number } {
+    return {
+      x: this.x,
+      y: this.y - 42,
+    };
+  }
+
   private drawDamageMarks(healthRatio: number): void {
     this.damageMarks.clear();
 

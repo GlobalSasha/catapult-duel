@@ -41,7 +41,11 @@ import {
   getWeatherDefinition,
   type WeatherId,
 } from "../core/weather";
-import { GAME_HEIGHT, GAME_WIDTH } from "../gameDimensions";
+import {
+  GAME_HEIGHT,
+  GAME_WIDTH,
+  IS_MOBILE_RENDER_TARGET,
+} from "../gameDimensions";
 import { STRINGS_RU } from "../i18n/strings.ru";
 import {
   center2KCameraOn,
@@ -104,6 +108,7 @@ export class BattleScene extends Phaser.Scene {
   private catapultViews!: Record<PlayerId, CatapultView>;
   private aimingControls!: AimingControls;
   private previewGraphics!: Phaser.GameObjects.Graphics;
+  private gestureGuide!: Phaser.GameObjects.Graphics;
   private fogOfWar!: Phaser.GameObjects.Graphics;
   private statusText!: Phaser.GameObjects.Text;
   private weatherText!: Phaser.GameObjects.Text;
@@ -122,6 +127,9 @@ export class BattleScene extends Phaser.Scene {
   private aiThinking = false;
   private launchInProgress = false;
   private audioContext: AudioContext | null = null;
+  private dragAimPointerId: number | null = null;
+  private dragAimStart = { x: 0, y: 0 };
+  private dragAimDistance = 0;
 
   constructor() {
     super("BattleScene");
@@ -187,6 +195,7 @@ export class BattleScene extends Phaser.Scene {
     this.createCatapultViews();
     this.cameras.main.fadeIn(300, 10, 8, 6);
     this.fogOfWar = this.add.graphics().setDepth(40);
+    this.gestureGuide = this.add.graphics().setDepth(16);
     this.updateFogOfWar();
     this.aimingControls = new AimingControls(this, {
       onChange: (values) => {
@@ -205,8 +214,16 @@ export class BattleScene extends Phaser.Scene {
       onRepair: () => this.repairActivePlayer(),
     });
     this.input.keyboard?.on("keydown", this.handleKeyDown, this);
+    this.input.on("pointerdown", this.handleAimPointerDown, this);
+    this.input.on("pointermove", this.handleAimPointerMove, this);
+    this.input.on("pointerup", this.handleAimPointerUp, this);
+    this.input.on("pointerupoutside", this.handleAimPointerUp, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.input.keyboard?.off("keydown", this.handleKeyDown, this);
+      this.input.off("pointerdown", this.handleAimPointerDown, this);
+      this.input.off("pointermove", this.handleAimPointerMove, this);
+      this.input.off("pointerup", this.handleAimPointerUp, this);
+      this.input.off("pointerupoutside", this.handleAimPointerUp, this);
       if (this.audioContext) {
         void this.audioContext.close();
         this.audioContext = null;
@@ -1468,6 +1485,105 @@ export class BattleScene extends Phaser.Scene {
     };
   }
 
+  private handleAimPointerDown(pointer: Phaser.Input.Pointer): void {
+    if (
+      this.launchInProgress ||
+      this.aiThinking ||
+      this.battleController.getState().phase !== "aiming" ||
+      this.dragAimPointerId !== null
+    ) {
+      return;
+    }
+
+    const worldPoint = this.cameras.main.getWorldPoint(
+      pointer.x,
+      pointer.y,
+    );
+    if (worldPoint.y > 720) {
+      return;
+    }
+
+    const playerId = this.battleController.getState().activePlayerId;
+    const anchor = this.catapultViews[playerId].getAimAnchorWorldPosition();
+    if (
+      Phaser.Math.Distance.Between(
+        worldPoint.x,
+        worldPoint.y,
+        anchor.x,
+        anchor.y,
+      ) > 155
+    ) {
+      return;
+    }
+
+    this.dragAimPointerId = pointer.id;
+    this.dragAimStart = anchor;
+    this.dragAimDistance = 0;
+    this.updateAimFromPointer(pointer);
+  }
+
+  private handleAimPointerMove(pointer: Phaser.Input.Pointer): void {
+    if (this.dragAimPointerId !== pointer.id) {
+      return;
+    }
+
+    this.updateAimFromPointer(pointer);
+  }
+
+  private handleAimPointerUp(pointer: Phaser.Input.Pointer): void {
+    if (this.dragAimPointerId !== pointer.id) {
+      return;
+    }
+
+    const shouldFire = this.dragAimDistance >= 28;
+    this.dragAimPointerId = null;
+    this.dragAimDistance = 0;
+    this.gestureGuide.clear();
+
+    if (shouldFire) {
+      this.fire(this.aimingControls.getValues());
+    }
+  }
+
+  private updateAimFromPointer(pointer: Phaser.Input.Pointer): void {
+    const worldPoint = this.cameras.main.getWorldPoint(
+      pointer.x,
+      pointer.y,
+    );
+    const playerId = this.battleController.getState().activePlayerId;
+    const direction = playerId === "left" ? 1 : -1;
+    const rawPullX =
+      (this.dragAimStart.x - worldPoint.x) * direction;
+    const pullX = Math.max(0, rawPullX);
+    const pullY = worldPoint.y - this.dragAimStart.y;
+    const distance = Math.sqrt(pullX * pullX + pullY * pullY);
+    const angleDeg = Phaser.Math.RadToDeg(
+      Math.atan2(pullY, Math.max(1, pullX)),
+    );
+    const power = Phaser.Math.Linear(
+      GAME_CONFIG.aiming.minPower,
+      GAME_CONFIG.aiming.maxPower,
+      Phaser.Math.Clamp(distance / 240, 0, 1),
+    );
+
+    this.dragAimDistance = distance;
+    this.aimingControls.setAimValues(angleDeg, power);
+    this.gestureGuide.clear();
+    this.gestureGuide.lineStyle(5, RETRO_UI.colors.cyan, 0.9);
+    this.gestureGuide.lineBetween(
+      this.dragAimStart.x,
+      this.dragAimStart.y,
+      worldPoint.x,
+      worldPoint.y,
+    );
+    this.gestureGuide.lineStyle(3, RETRO_UI.colors.cream, 0.82);
+    this.gestureGuide.strokeCircle(
+      this.dragAimStart.x,
+      this.dragAimStart.y,
+      42,
+    );
+  }
+
   private selectProjectile(projectileType: ProjectileType): boolean {
     const battleState = this.battleController.getState();
     const result = this.battleController.selectProjectile(
@@ -1815,10 +1931,17 @@ export class BattleScene extends Phaser.Scene {
 
   private getAimingStatus(): string {
     const battleState = this.battleController.getState();
-    return STRINGS_RU.aimingStatusForName(
-      battleState.turnNumber,
-      this.matchSettings.playerNames[battleState.activePlayerId],
-    );
+    const playerName =
+      this.matchSettings.playerNames[battleState.activePlayerId];
+    return IS_MOBILE_RENDER_TARGET
+      ? STRINGS_RU.touchAimingStatusForName(
+          battleState.turnNumber,
+          playerName,
+        )
+      : STRINGS_RU.aimingStatusForName(
+          battleState.turnNumber,
+          playerName,
+        );
   }
 
   private isAiTurn(): boolean {

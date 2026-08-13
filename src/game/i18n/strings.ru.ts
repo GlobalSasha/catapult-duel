@@ -123,6 +123,8 @@ export const STRINGS_RU = {
     `Ход ${turnNumber} · настройте угол и силу · активен Игрок ${playerNumber}`,
   aimingStatusForName: (turnNumber: number, playerName: string) =>
     `Ход ${turnNumber} · настройте угол и силу · активен ${playerName}`,
+  touchAimingStatusForName: (turnNumber: number, playerName: string) =>
+    `Ход ${turnNumber} · оттяните катапульту и отпустите · ${playerName}`,
   aiThinkingStatus: (difficulty: string) =>
     `AI рассчитывает выстрел · сложность: ${difficulty}`,
   projectileFlightStatus: "Снаряд в полёте · управление заблокировано",
