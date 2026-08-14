@@ -1,10 +1,6 @@
 import * as Phaser from "phaser";
 
-import {
-  IS_MOBILE_RENDER_TARGET,
-  RENDER_HEIGHT,
-  RENDER_WIDTH,
-} from "./game/gameDimensions";
+import { RENDER_HEIGHT, RENDER_WIDTH } from "./game/gameDimensions";
 import { musicController } from "./game/audio/MusicController";
 import { STRINGS_RU } from "./game/i18n/strings.ru";
 import { BattleScene } from "./game/scenes/BattleScene";
@@ -189,9 +185,7 @@ const config: Phaser.Types.Core.GameConfig = {
     ResultScene,
   ],
   scale: {
-    mode: IS_MOBILE_RENDER_TARGET
-      ? Phaser.Scale.RESIZE
-      : Phaser.Scale.FIT,
+    mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
     autoRound: true,
     width: RENDER_WIDTH,
