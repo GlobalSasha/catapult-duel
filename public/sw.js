@@ -1,4 +1,4 @@
-const CACHE_NAME = "catapult-duel-v1";
+const CACHE_NAME = "catapult-duel-v2";
 const CORE_FILES = ["./", "./manifest.webmanifest", "./icons/icon-192.png"];
 
 self.addEventListener("install", (event) => {

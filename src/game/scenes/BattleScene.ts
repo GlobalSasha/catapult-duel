@@ -63,7 +63,10 @@ import {
 import { RETRO_UI } from "../ui/retroTheme";
 import { musicController } from "../audio/MusicController";
 import { CatapultView } from "../views/CatapultView";
-import { KnightSquadView } from "../views/KnightSquadView";
+import {
+  KNIGHT_MARCH_DURATION_MS,
+  KnightSquadView,
+} from "../views/KnightSquadView";
 import { createCastleAmbientEffects } from "../views/CastleAmbientEffects";
 import {
   createCastleTowerSprite,
@@ -129,6 +132,7 @@ export class BattleScene extends Phaser.Scene {
   private matchSettings: MatchSettings = readMatchSettings(undefined);
   private aiThinking = false;
   private launchInProgress = false;
+  private knightMarchInProgress = false;
   private audioContext: AudioContext | null = null;
   private dragAimPointerId: number | null = null;
   private dragAimStart = { x: 0, y: 0 };
@@ -1710,7 +1714,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private fire(values: AimingValues): void {
-    if (this.launchInProgress) {
+    if (this.launchInProgress || this.knightMarchInProgress) {
       return;
     }
 
@@ -1936,7 +1940,9 @@ export class BattleScene extends Phaser.Scene {
     const battleState = transition.state;
     this.renderBattleState();
     this.updateFogOfWar();
-    this.showBattleEvents(transition.events);
+    const battleEventDuration = this.showBattleEvents(transition.events);
+    const knightsAreMarching = battleEventDuration > 0;
+    this.knightMarchInProgress = knightsAreMarching;
 
     const burnDamage = transition.events.reduce(
       (sum, event) =>
@@ -1955,16 +1961,22 @@ export class BattleScene extends Phaser.Scene {
           STRINGS_RU.burnDamageStatus(burnDamage),
         );
       }
-      this.time.delayedCall(GAME_CONFIG.battle.resultDisplayMs, () => {
-        this.scene.start("ResultScene", {
-          winnerId: battleState.winnerId,
-          isDraw: battleState.isDraw,
-          victoryReason: battleState.victoryReason,
-          turnNumber: battleState.turnNumber,
-          arenaId: this.arenaId,
-          placement: this.matchPlacement,
-        });
-      });
+      this.time.delayedCall(
+        Math.max(
+          GAME_CONFIG.battle.resultDisplayMs,
+          battleEventDuration + 200,
+        ),
+        () => {
+          this.scene.start("ResultScene", {
+            winnerId: battleState.winnerId,
+            isDraw: battleState.isDraw,
+            victoryReason: battleState.victoryReason,
+            turnNumber: battleState.turnNumber,
+            arenaId: this.arenaId,
+            placement: this.matchPlacement,
+          });
+        },
+      );
       return;
     }
 
@@ -1978,21 +1990,46 @@ export class BattleScene extends Phaser.Scene {
     );
     this.updateWorldMarker(activePlayer.catapultX);
     this.statusText.setText(
-      burnDamage > 0
-        ? STRINGS_RU.burnDamageStatus(burnDamage)
-        : this.getAimingStatus(),
+      knightsAreMarching
+        ? STRINGS_RU.knightMovementStatus(
+            battleState.knightSquads.left.progress,
+          )
+        : burnDamage > 0
+          ? STRINGS_RU.burnDamageStatus(burnDamage)
+          : this.getAimingStatus(),
     );
     const aiTurn = this.isAiTurn();
-    this.aimingControls.setEnabled(!aiTurn);
+    this.aimingControls.setEnabled(!aiTurn && !knightsAreMarching);
     this.redrawPreview(this.aimingControls.getValues());
 
     if (aiTurn) {
-      this.scheduleAiTurn(GAME_CONFIG.battle.cameraPanMs + 300);
+      this.scheduleAiTurn(
+        Math.max(
+          GAME_CONFIG.battle.cameraPanMs + 300,
+          battleEventDuration + 200,
+        ),
+      );
+    }
+
+    if (knightsAreMarching) {
+      this.time.delayedCall(battleEventDuration, () => {
+        this.knightMarchInProgress = false;
+        if (this.battleController.getState().phase !== "aiming") {
+          return;
+        }
+        this.statusText.setText(this.getAimingStatus());
+        if (!this.isAiTurn()) {
+          this.aimingControls.setEnabled(true);
+        }
+      });
     }
 
     if (burnDamage > 0) {
       this.time.delayedCall(700, () => {
-        if (this.battleController.getState().phase === "aiming") {
+        if (
+          this.battleController.getState().phase === "aiming" &&
+          !this.knightMarchInProgress
+        ) {
           this.statusText.setText(this.getAimingStatus());
         }
       });
@@ -2530,7 +2567,7 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  private showBattleEvents(events: readonly BattleEvent[]): void {
+  private showBattleEvents(events: readonly BattleEvent[]): number {
     const damageByPlayer: Record<PlayerId, number> = {
       left: 0,
       right: 0,
@@ -2586,6 +2623,10 @@ export class BattleScene extends Phaser.Scene {
         this.showDamage(playerId, damage);
       }
     });
+
+    return events.some((event) => event.kind === "knight-move")
+      ? KNIGHT_MARCH_DURATION_MS
+      : 0;
   }
 
   private showKnightDamage(targetId: PlayerId, damage: number): void {

@@ -147,6 +147,8 @@ export const STRINGS_RU = {
     `Попадание по рыцарям · урон отряду ${damage}`,
   knightRoundStatus: (roundNumber: number) =>
     `МАРШ ${Math.min(roundNumber, 10)}/10`,
+  knightMovementStatus: (roundNumber: number) =>
+    `РЫЦАРИ МАРШИРУЮТ · ${Math.min(roundNumber, 10)}/10`,
   burnDamageStatus: (damage: number) =>
     `Горение в конце хода · урон ${damage}`,
   groundStatus: "Снаряд попал в землю · урон 0",

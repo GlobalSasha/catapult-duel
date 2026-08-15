@@ -4,6 +4,8 @@ import type { KnightSquadState } from "../core/battleTypes";
 import { GAME_CONFIG } from "../core/gameConfig";
 import { RETRO_UI } from "../ui/retroTheme";
 
+export const KNIGHT_MARCH_DURATION_MS = 2_800;
+
 export class KnightSquadView {
   private static readonly UNIT_KEYS = {
     left: ["royal-swordswoman", "royal-spearman", "royal-ranger"],
@@ -41,7 +43,7 @@ export class KnightSquadView {
             start: 0,
             end: 7,
           }),
-          frameRate: 10,
+          frameRate: 9,
           repeat: -1,
         });
       }
@@ -133,8 +135,8 @@ export class KnightSquadView {
       x: toX,
       y: toY,
       angle: direction * 0.8,
-      duration: 920,
-      ease: "Sine.easeInOut",
+      duration: KNIGHT_MARCH_DURATION_MS,
+      ease: "Linear",
       onComplete: () => {
         this.container.setAngle(0);
         this.fighters.forEach((fighter, index) => {
