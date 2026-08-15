@@ -1183,24 +1183,38 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private createStatus(): void {
+    const panelX = 430;
+    const panelY = 140;
+    const panelWidth = 740;
+    const panelHeight = 46;
     const panel = this.add
       .graphics()
       .setX(this.uiOffsetX)
       .setScrollFactor(0)
       .setDepth(900);
 
-    panel.fillStyle(COLORS.panel, 0.98);
-    panel.fillRect(470, 88, 660, 28);
-    panel.lineStyle(RETRO_UI.line.hairline, COLORS.panelStroke, 0.76);
-    panel.strokeRect(470, 88, 660, 28);
-    panel.fillStyle(RETRO_UI.colors.orange, 1);
-    panel.fillRect(470, 88, 6, 28);
+    panel.fillStyle(RETRO_UI.colors.ink, 0.6);
+    panel.fillRoundedRect(panelX, panelY, panelWidth, panelHeight, 8);
+    panel.lineStyle(2, COLORS.panelStroke, 0.68);
+    panel.strokeRoundedRect(panelX, panelY, panelWidth, panelHeight, 8);
+    panel.lineStyle(1, RETRO_UI.colors.cyan, 0.3);
+    panel.strokeRoundedRect(panelX + 5, panelY + 5, panelWidth - 10, panelHeight - 10, 5);
+
+    panel.lineStyle(3, RETRO_UI.colors.orange, 0.9);
+    panel.lineBetween(panelX + 14, panelY + 9, panelX + 50, panelY + 9);
+    panel.lineBetween(panelX + 14, panelY + 9, panelX + 14, panelY + 22);
+    panel.lineBetween(panelX + panelWidth - 14, panelY + panelHeight - 9, panelX + panelWidth - 50, panelY + panelHeight - 9);
+    panel.lineBetween(panelX + panelWidth - 14, panelY + panelHeight - 9, panelX + panelWidth - 14, panelY + panelHeight - 22);
+    panel.fillStyle(RETRO_UI.colors.cyan, 0.9);
+    panel.fillCircle(panelX + 30, panelY + 31, 3);
+    panel.fillStyle(RETRO_UI.colors.orange, 0.9);
+    panel.fillCircle(panelX + 42, panelY + 31, 3);
 
     this.statusText = this.add
-      .text(800 + this.uiOffsetX, 102, this.getAimingStatus(), {
+      .text(800 + this.uiOffsetX, panelY + panelHeight / 2, this.getAimingStatus(), {
         color: COLORS.primaryText,
         fontFamily: UI_FONT,
-        fontSize: "13px",
+        fontSize: "14px",
         fontStyle: "bold",
       })
       .setOrigin(0.5)
