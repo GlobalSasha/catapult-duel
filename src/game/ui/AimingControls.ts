@@ -173,19 +173,10 @@ export class AimingControls extends Phaser.GameObjects.Container {
         ),
     );
 
-    const projectileDetailPanel = new Phaser.GameObjects.Rectangle(
-      scene,
-      350,
-      752,
-      650,
-      66,
-      RETRO_UI.colors.ink,
-      0.94,
-    ).setStrokeStyle(3, RETRO_UI.colors.border, 0.9);
     this.projectileDetailTitle = new Phaser.GameObjects.Text(
       scene,
       48,
-      741,
+      0,
       "",
       {
         color: RETRO_UI.text.orange,
@@ -194,11 +185,11 @@ export class AimingControls extends Phaser.GameObjects.Container {
         fontStyle: "bold",
         letterSpacing: 1,
       },
-    ).setOrigin(0, 0.5);
+    ).setVisible(false);
     this.projectileDetailDescription = new Phaser.GameObjects.Text(
       scene,
       48,
-      765,
+      0,
       "",
       {
         color: RETRO_UI.text.secondary,
@@ -207,7 +198,7 @@ export class AimingControls extends Phaser.GameObjects.Container {
         fontStyle: "bold",
         wordWrap: { width: 548 },
       },
-    ).setOrigin(0, 0.5);
+    ).setVisible(false);
 
     this.angleSlider = this.createSlider({
       scene,
@@ -365,9 +356,6 @@ export class AimingControls extends Phaser.GameObjects.Container {
         button.marker,
         button.label,
       ]),
-      projectileDetailPanel,
-      this.projectileDetailTitle,
-      this.projectileDetailDescription,
       this.angleSlider.hitZone,
       this.angleSlider.track,
       this.angleSlider.fill,

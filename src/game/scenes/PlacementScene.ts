@@ -41,6 +41,7 @@ import {
 } from "../views/drawProtection";
 import { RETRO_UI } from "../ui/retroTheme";
 import { musicController } from "../audio/MusicController";
+import { drawArenaTerrain } from "../views/drawArenaTerrain";
 
 interface PlacementSceneData {
   arenaId?: ArenaId;
@@ -174,39 +175,7 @@ export class PlacementScene extends Phaser.Scene {
   }
 
   private drawTerrain(arena: ArenaDefinition): void {
-    const terrain = this.add.graphics().setDepth(-35);
-    const firstPoint = arena.terrain[0];
-    const lastPoint = arena.terrain.at(-1);
-
-    if (!firstPoint || !lastPoint) {
-      return;
-    }
-
-    terrain.fillStyle(arena.palette.groundColor, 0.98);
-    terrain.lineStyle(6, arena.palette.surfaceColor, 0.86);
-    terrain.beginPath();
-    terrain.moveTo(firstPoint.x, firstPoint.y);
-    arena.terrain.slice(1).forEach((point) => {
-      terrain.lineTo(point.x, point.y);
-    });
-    terrain.lineTo(lastPoint.x, GAME_CONFIG.world.height);
-    terrain.lineTo(firstPoint.x, GAME_CONFIG.world.height);
-    terrain.closePath();
-    terrain.fillPath();
-    terrain.strokePath();
-
-    for (let x = 150; x < GAME_CONFIG.world.width; x += 190) {
-      const groundY = getTerrainHeightAt(arena.terrain, x);
-      terrain.fillStyle(arena.palette.detailColor, 0.55);
-      terrain.fillTriangle(
-        x,
-        groundY + 42,
-        x + 24,
-        groundY + 14,
-        x + 48,
-        groundY + 44,
-      );
-    }
+    drawArenaTerrain(this, arena, -35);
 
     for (let index = 0; index < 34; index += 1) {
       const x = 110 + index * 205;

@@ -73,6 +73,7 @@ import {
   PROTECTION_VIEW_COLORS,
 } from "../views/drawProtection";
 import { PROJECTILE_TEXTURE_KEYS } from "../views/projectileVisuals";
+import { drawArenaTerrain } from "../views/drawArenaTerrain";
 
 const COLORS = {
   panel: RETRO_UI.colors.panel,
@@ -86,6 +87,7 @@ const COLORS = {
 
 const DISPLAY_FONT = RETRO_UI.font.display;
 const UI_FONT = RETRO_UI.font.ui;
+const BATTLE_HEADER_HEIGHT = 128;
 
 interface BattleSceneData {
   arenaId?: ArenaId;
@@ -283,43 +285,7 @@ export class BattleScene extends Phaser.Scene {
       this.drawWastelandInfrastructure(arena);
     }
 
-    const terrain = this.add.graphics().setDepth(-40);
-    const firstPoint = arena.terrain[0];
-    const lastPoint = arena.terrain.at(-1);
-
-    if (firstPoint && lastPoint) {
-      terrain.fillStyle(arena.palette.groundColor, 0.98);
-      terrain.lineStyle(6, arena.palette.surfaceColor, 0.78);
-      terrain.beginPath();
-      terrain.moveTo(firstPoint.x, firstPoint.y);
-      arena.terrain.slice(1).forEach((point) => {
-        terrain.lineTo(point.x, point.y);
-      });
-      terrain.lineTo(lastPoint.x, GAME_CONFIG.world.height);
-      terrain.lineTo(firstPoint.x, GAME_CONFIG.world.height);
-      terrain.closePath();
-      terrain.fillPath();
-      terrain.strokePath();
-    }
-
-    for (let x = 140; x < GAME_CONFIG.world.width; x += 190) {
-      const pointIndex = Math.floor(x / 190) % arena.terrain.length;
-      const point = arena.terrain[pointIndex];
-
-      if (!point) {
-        continue;
-      }
-
-      terrain.fillStyle(arena.palette.detailColor, 0.58);
-      terrain.fillTriangle(
-        x,
-        Math.min(point.y + 38, GAME_HEIGHT - 20),
-        x + 22,
-        Math.min(point.y + 12, GAME_HEIGHT - 20),
-        x + 44,
-        Math.min(point.y + 42, GAME_HEIGHT - 20),
-      );
-    }
+    drawArenaTerrain(this, arena, -40);
 
     arena.obstacles.forEach((obstacle) => {
       this.drawObstacle(arena, obstacle);
@@ -334,7 +300,7 @@ export class BattleScene extends Phaser.Scene {
     }
 
     this.add
-      .rectangle(0, 0, GAME_WIDTH, 196, RETRO_UI.colors.ink, 0.88)
+      .rectangle(0, 0, GAME_WIDTH, BATTLE_HEADER_HEIGHT, RETRO_UI.colors.ink, 0.88)
       .setOrigin(0)
       .setScrollFactor(0)
       .setDepth(800);
@@ -356,9 +322,9 @@ export class BattleScene extends Phaser.Scene {
     this.add
       .rectangle(
         0,
-        196,
+        BATTLE_HEADER_HEIGHT,
         GAME_WIDTH,
-        GAME_HEIGHT - 196,
+        GAME_HEIGHT - BATTLE_HEADER_HEIGHT,
         palette.color,
         palette.alpha,
       )
@@ -423,7 +389,7 @@ export class BattleScene extends Phaser.Scene {
       return;
     }
 
-    const fallDistance = GAME_HEIGHT - 196;
+    const fallDistance = GAME_HEIGHT - BATTLE_HEADER_HEIGHT;
 
     for (let layerIndex = 0; layerIndex < 2; layerIndex += 1) {
       const layer = this.add
@@ -436,13 +402,13 @@ export class BattleScene extends Phaser.Scene {
         layer.lineStyle(2, 0x9ed8ff, 0.28);
         for (let index = 0; index < 56; index += 1) {
           const x = (index * 137 + layerIndex * 59) % GAME_WIDTH;
-          const y = 196 + ((index * 83) % fallDistance);
+          const y = BATTLE_HEADER_HEIGHT + ((index * 83) % fallDistance);
           layer.lineBetween(x, y, x - 13, y + 34);
         }
       } else {
         for (let index = 0; index < 48; index += 1) {
           const x = (index * 149 + layerIndex * 71) % GAME_WIDTH;
-          const y = 196 + ((index * 97) % fallDistance);
+          const y = BATTLE_HEADER_HEIGHT + ((index * 97) % fallDistance);
           const radius = 2 + (index % 3);
           layer.fillStyle(0xe4f7ff, 0.32 + (index % 4) * 0.08);
           layer.fillCircle(x, y, radius);
@@ -1150,17 +1116,17 @@ export class BattleScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(900);
     frame.lineStyle(RETRO_UI.line.selected, RETRO_UI.colors.orange, 0.9);
-    frame.lineBetween(0, 192, GAME_WIDTH, 192);
+    frame.lineBetween(0, 124, GAME_WIDTH, 124);
     frame.lineStyle(RETRO_UI.line.hairline, RETRO_UI.colors.border, 0.7);
-    frame.lineBetween(0, 184, GAME_WIDTH, 184);
+    frame.lineBetween(0, 116, GAME_WIDTH, 116);
     frame.fillStyle(RETRO_UI.colors.orange, 1);
-    frame.fillRect(44, 40, 8, 88);
+    frame.fillRect(40, 26, 7, 58);
 
     this.add
-      .text(64 + this.uiOffsetX, 48, STRINGS_RU.gameTitle, {
+      .text(58 + this.uiOffsetX, 28, STRINGS_RU.gameTitle, {
         color: RETRO_UI.text.orange,
         fontFamily: DISPLAY_FONT,
-        fontSize: "36px",
+        fontSize: "30px",
         fontStyle: "bold",
         letterSpacing: 4,
         stroke: RETRO_UI.text.ink,
@@ -1171,10 +1137,10 @@ export class BattleScene extends Phaser.Scene {
       .setDepth(901);
 
     this.add
-      .text(66 + this.uiOffsetX, 94, STRINGS_RU.battleSubtitle, {
+      .text(60 + this.uiOffsetX, 66, STRINGS_RU.battleSubtitle, {
         color: COLORS.secondaryText,
         fontFamily: UI_FONT,
-        fontSize: "15px",
+        fontSize: "11px",
         letterSpacing: 2,
       })
       .setOrigin(0, 0)
@@ -1187,17 +1153,17 @@ export class BattleScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(901);
     badge.fillStyle(COLORS.panel, 0.98);
-    badge.fillRect(1250, 42, 286, 82);
+    badge.fillRect(1260, 22, 276, 62);
     badge.lineStyle(RETRO_UI.line.selected, RETRO_UI.colors.ink, 1);
-    badge.strokeRect(1250, 42, 286, 82);
+    badge.strokeRect(1260, 22, 276, 62);
     badge.lineStyle(RETRO_UI.line.hairline, RETRO_UI.colors.cyan, 0.85);
-    badge.strokeRect(1258, 50, 270, 66);
+    badge.strokeRect(1267, 29, 262, 48);
 
     this.weatherText = this.add
-      .text(1393 + this.uiOffsetX, 67, "", {
+      .text(1398 + this.uiOffsetX, 42, "", {
         color: COLORS.ready,
         fontFamily: UI_FONT,
-        fontSize: "16px",
+        fontSize: "13px",
         fontStyle: "bold",
       })
       .setOrigin(0.5)
@@ -1205,10 +1171,10 @@ export class BattleScene extends Phaser.Scene {
       .setDepth(902);
 
     this.windText = this.add
-      .text(1393 + this.uiOffsetX, 98, "", {
+      .text(1398 + this.uiOffsetX, 66, "", {
         color: COLORS.primaryText,
         fontFamily: UI_FONT,
-        fontSize: "14px",
+        fontSize: "12px",
         fontStyle: "bold",
       })
       .setOrigin(0.5)
@@ -1224,17 +1190,17 @@ export class BattleScene extends Phaser.Scene {
       .setDepth(900);
 
     panel.fillStyle(COLORS.panel, 0.98);
-    panel.fillRect(475, 124, 650, 54);
+    panel.fillRect(470, 88, 660, 28);
     panel.lineStyle(RETRO_UI.line.hairline, COLORS.panelStroke, 0.76);
-    panel.strokeRect(475, 124, 650, 54);
+    panel.strokeRect(470, 88, 660, 28);
     panel.fillStyle(RETRO_UI.colors.orange, 1);
-    panel.fillRect(475, 124, 7, 54);
+    panel.fillRect(470, 88, 6, 28);
 
     this.statusText = this.add
-      .text(800 + this.uiOffsetX, 151, this.getAimingStatus(), {
+      .text(800 + this.uiOffsetX, 102, this.getAimingStatus(), {
         color: COLORS.primaryText,
         fontFamily: UI_FONT,
-        fontSize: "18px",
+        fontSize: "13px",
         fontStyle: "bold",
       })
       .setOrigin(0.5)
@@ -1244,7 +1210,7 @@ export class BattleScene extends Phaser.Scene {
 
   private createWorldRail(): void {
     const railX = 1226;
-    const railY = 142;
+    const railY = 96;
     const railWidth = 250;
     const rail = this.add
       .graphics()
