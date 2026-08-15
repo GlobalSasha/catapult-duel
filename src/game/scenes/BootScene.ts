@@ -1,6 +1,10 @@
 import * as Phaser from "phaser";
 
-import { configure2KCamera, sharpenSceneText } from "../rendering";
+import {
+  configure2KCamera,
+  getLogicalViewport,
+  sharpenSceneText,
+} from "../rendering";
 import { RETRO_UI } from "../ui/retroTheme";
 
 const DISPLAY_FONT = RETRO_UI.font.display;
@@ -121,9 +125,10 @@ export class BootScene extends Phaser.Scene {
   create(): void {
     this.transitionStarted = false;
     this.canSkip = false;
+    const viewport = getLogicalViewport(this);
     const campaignBackdrop = this.add
       .image(800, 450, "arena-highlands")
-      .setDisplaySize(1680, 945)
+      .setDisplaySize(viewport.width * 1.05, viewport.height * 1.05)
       .setTint(0xd58a59)
       .setDepth(-10);
     this.backdropWash.setAlpha(0.9).setDepth(-9);
@@ -159,6 +164,7 @@ export class BootScene extends Phaser.Scene {
   }
 
   private drawLoadingScreen(): void {
+    const viewport = getLogicalViewport(this);
     this.backdropWash = this.add.graphics();
     this.backdropWash.fillGradientStyle(
       RETRO_UI.colors.orangeDark,
@@ -167,7 +173,12 @@ export class BootScene extends Phaser.Scene {
       RETRO_UI.colors.ink,
       1,
     );
-    this.backdropWash.fillRect(0, 0, 1600, 900);
+    this.backdropWash.fillRect(
+      -viewport.overflowX,
+      -viewport.overflowY,
+      viewport.width,
+      viewport.height,
+    );
 
     for (let index = 0; index < 30; index += 1) {
       const x = 30 + ((index * 191) % 1540);

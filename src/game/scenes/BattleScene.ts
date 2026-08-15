@@ -51,6 +51,7 @@ import {
   center2KCameraOn,
   configure2KCamera,
   follow2KCameraOnStep,
+  getLogicalViewport,
   pan2KCameraOn,
   set2KCameraBounds,
   sharpenSceneText,
@@ -130,6 +131,7 @@ export class BattleScene extends Phaser.Scene {
   private dragAimPointerId: number | null = null;
   private dragAimStart = { x: 0, y: 0 };
   private dragAimDistance = 0;
+  private uiOffsetX = 0;
 
   constructor() {
     super("BattleScene");
@@ -137,6 +139,7 @@ export class BattleScene extends Phaser.Scene {
 
   create(data: BattleSceneData): void {
     configure2KCamera(this);
+    this.uiOffsetX = getLogicalViewport(this).overflowX;
     musicController.setTheme("battle");
     this.matchSettings = readMatchSettings(
       this.registry.get(MATCH_SETTINGS_REGISTRY_KEY),
@@ -1134,7 +1137,11 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private drawHeader(): void {
-    const frame = this.add.graphics().setScrollFactor(0).setDepth(900);
+    const frame = this.add
+      .graphics()
+      .setX(this.uiOffsetX)
+      .setScrollFactor(0)
+      .setDepth(900);
     frame.lineStyle(RETRO_UI.line.selected, RETRO_UI.colors.orange, 0.9);
     frame.lineBetween(0, 192, GAME_WIDTH, 192);
     frame.lineStyle(RETRO_UI.line.hairline, RETRO_UI.colors.border, 0.7);
@@ -1143,7 +1150,7 @@ export class BattleScene extends Phaser.Scene {
     frame.fillRect(44, 40, 8, 88);
 
     this.add
-      .text(64, 48, STRINGS_RU.gameTitle, {
+      .text(64 + this.uiOffsetX, 48, STRINGS_RU.gameTitle, {
         color: RETRO_UI.text.orange,
         fontFamily: DISPLAY_FONT,
         fontSize: "36px",
@@ -1157,7 +1164,7 @@ export class BattleScene extends Phaser.Scene {
       .setDepth(901);
 
     this.add
-      .text(66, 94, STRINGS_RU.battleSubtitle, {
+      .text(66 + this.uiOffsetX, 94, STRINGS_RU.battleSubtitle, {
         color: COLORS.secondaryText,
         fontFamily: UI_FONT,
         fontSize: "15px",
@@ -1167,7 +1174,11 @@ export class BattleScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(901);
 
-    const badge = this.add.graphics().setScrollFactor(0).setDepth(901);
+    const badge = this.add
+      .graphics()
+      .setX(this.uiOffsetX)
+      .setScrollFactor(0)
+      .setDepth(901);
     badge.fillStyle(COLORS.panel, 0.98);
     badge.fillRect(1250, 42, 286, 82);
     badge.lineStyle(RETRO_UI.line.selected, RETRO_UI.colors.ink, 1);
@@ -1176,7 +1187,7 @@ export class BattleScene extends Phaser.Scene {
     badge.strokeRect(1258, 50, 270, 66);
 
     this.weatherText = this.add
-      .text(1393, 67, "", {
+      .text(1393 + this.uiOffsetX, 67, "", {
         color: COLORS.ready,
         fontFamily: UI_FONT,
         fontSize: "16px",
@@ -1187,7 +1198,7 @@ export class BattleScene extends Phaser.Scene {
       .setDepth(902);
 
     this.windText = this.add
-      .text(1393, 98, "", {
+      .text(1393 + this.uiOffsetX, 98, "", {
         color: COLORS.primaryText,
         fontFamily: UI_FONT,
         fontSize: "14px",
@@ -1199,7 +1210,11 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private createStatus(): void {
-    const panel = this.add.graphics().setScrollFactor(0).setDepth(900);
+    const panel = this.add
+      .graphics()
+      .setX(this.uiOffsetX)
+      .setScrollFactor(0)
+      .setDepth(900);
 
     panel.fillStyle(COLORS.panel, 0.98);
     panel.fillRect(475, 124, 650, 54);
@@ -1209,7 +1224,7 @@ export class BattleScene extends Phaser.Scene {
     panel.fillRect(475, 124, 7, 54);
 
     this.statusText = this.add
-      .text(800, 151, this.getAimingStatus(), {
+      .text(800 + this.uiOffsetX, 151, this.getAimingStatus(), {
         color: COLORS.primaryText,
         fontFamily: UI_FONT,
         fontSize: "18px",
@@ -1224,7 +1239,11 @@ export class BattleScene extends Phaser.Scene {
     const railX = 1226;
     const railY = 142;
     const railWidth = 250;
-    const rail = this.add.graphics().setScrollFactor(0).setDepth(905);
+    const rail = this.add
+      .graphics()
+      .setX(this.uiOffsetX)
+      .setScrollFactor(0)
+      .setDepth(905);
 
     rail.fillStyle(RETRO_UI.colors.ink, 0.95);
     rail.fillRect(railX, railY, railWidth, 18);
@@ -1237,7 +1256,7 @@ export class BattleScene extends Phaser.Scene {
 
     this.worldPositionMarker = this.add
       .rectangle(
-        railX + 9,
+        railX + 9 + this.uiOffsetX,
         railY + 9,
         14,
         24,
@@ -1261,7 +1280,9 @@ export class BattleScene extends Phaser.Scene {
       1,
     );
 
-    this.worldPositionMarker.setX(railStartX + railWidth * progress);
+    this.worldPositionMarker.setX(
+      railStartX + this.uiOffsetX + railWidth * progress,
+    );
   }
 
   private centerCameraOnActivePlayer(): void {

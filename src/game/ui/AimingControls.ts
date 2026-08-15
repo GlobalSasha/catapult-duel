@@ -8,6 +8,12 @@ import {
   type ProjectileType,
 } from "../core/projectileCatalog";
 import { STRINGS_RU } from "../i18n/strings.ru";
+import {
+  GAME_HEIGHT,
+  GAME_WIDTH,
+  IS_MOBILE_RENDER_TARGET,
+} from "../gameDimensions";
+import { getLogicalViewport } from "../rendering";
 import { PROJECTILE_TEXTURE_KEYS } from "../views/projectileVisuals";
 import { RETRO_UI } from "./retroTheme";
 
@@ -84,7 +90,17 @@ export class AimingControls extends Phaser.GameObjects.Container {
   ) {
     super(scene, 0, 0);
     scene.add.existing(this);
-    this.setScrollFactor(0).setDepth(1000);
+    const viewport = getLogicalViewport(scene);
+    const mobileUiScale = IS_MOBILE_RENDER_TARGET
+      ? Math.min(1.2, viewport.width / GAME_WIDTH)
+      : 1;
+    this.setPosition(
+      (viewport.width - GAME_WIDTH * mobileUiScale) / 2,
+      GAME_HEIGHT - GAME_HEIGHT * mobileUiScale,
+    )
+      .setScale(mobileUiScale)
+      .setScrollFactor(0)
+      .setDepth(1000);
     this.callbacks = callbacks;
 
     const dockSpecs = [
@@ -471,12 +487,13 @@ export class AimingControls extends Phaser.GameObjects.Container {
     x: number,
     y: number,
   ): ProjectileButtonView {
+    const panelHeight = IS_MOBILE_RENDER_TARGET ? 90 : 82;
     const panel = new Phaser.GameObjects.Rectangle(
       scene,
       x,
       y,
       120,
-      82,
+      panelHeight,
       COLORS.track,
       0.96,
     ).setStrokeStyle(2, COLORS.panelStroke, 0.55);
@@ -484,18 +501,18 @@ export class AimingControls extends Phaser.GameObjects.Container {
       scene,
       projectileType,
       x,
-      y - 13,
+      y - 15,
     );
     const label = new Phaser.GameObjects.Text(
       scene,
       x,
-      y + 28,
+      y + 31,
       this.getProjectileCardLabel(projectileType),
       {
         align: "center",
         color: COLORS.text,
         fontFamily: UI_FONT,
-        fontSize: "9px",
+        fontSize: IS_MOBILE_RENDER_TARGET ? "12px" : "9px",
         fontStyle: "bold",
         letterSpacing: 0.5,
       },
@@ -505,7 +522,7 @@ export class AimingControls extends Phaser.GameObjects.Container {
       x,
       y,
       132,
-      96,
+      104,
       0xffffff,
       0.001,
     )

@@ -7,14 +7,18 @@ import {
   type ArenaDefinition,
   type ArenaId,
 } from "../arena/arenaCatalog";
-import { GAME_HEIGHT, GAME_WIDTH } from "../gameDimensions";
+import { GAME_WIDTH } from "../gameDimensions";
 import { STRINGS_RU } from "../i18n/strings.ru";
 import {
   MATCH_SETTINGS_REGISTRY_KEY,
   readMatchSettings,
   type MatchSettings,
 } from "../core/matchSession";
-import { configure2KCamera, sharpenSceneText } from "../rendering";
+import {
+  configure2KCamera,
+  getLogicalViewport,
+  sharpenSceneText,
+} from "../rendering";
 import { RETRO_UI } from "../ui/retroTheme";
 import { musicController } from "../audio/MusicController";
 
@@ -57,15 +61,28 @@ export class MenuScene extends Phaser.Scene {
     this.selectedArenaId = DEFAULT_ARENA_ID;
     this.battleStarted = false;
     this.cards.clear();
+    const viewport = getLogicalViewport(this);
+    const backdropX = -viewport.overflowX;
 
     this.background = this.add
-      .image(0, 0, getArenaDefinition(this.selectedArenaId).textureKey)
+      .image(
+        backdropX,
+        -viewport.overflowY,
+        getArenaDefinition(this.selectedArenaId).textureKey,
+      )
       .setOrigin(0)
-      .setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
+      .setDisplaySize(viewport.width, viewport.height)
       .setTint(0xc77953);
 
     this.add
-      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, COLORS.navy, 0.54)
+      .rectangle(
+        backdropX,
+        -viewport.overflowY,
+        viewport.width,
+        viewport.height,
+        COLORS.navy,
+        0.54,
+      )
       .setOrigin(0);
     const atmosphere = this.add.graphics();
     atmosphere.fillGradientStyle(
@@ -78,11 +95,18 @@ export class MenuScene extends Phaser.Scene {
       0.12,
       0.12,
     );
-    atmosphere.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    atmosphere.fillRect(
+      backdropX,
+      -viewport.overflowY,
+      viewport.width,
+      viewport.height,
+    );
     this.add
-      .rectangle(0, 0, GAME_WIDTH, 172, COLORS.navy, 0.9)
+      .rectangle(backdropX, 0, viewport.width, 172, COLORS.navy, 0.9)
       .setOrigin(0);
-    this.add.rectangle(0, 168, GAME_WIDTH, 4, COLORS.amber, 0.9).setOrigin(0);
+    this.add
+      .rectangle(backdropX, 168, viewport.width, 4, COLORS.amber, 0.9)
+      .setOrigin(0);
 
     this.drawHeader();
     this.drawNavigation();

@@ -1,6 +1,7 @@
 import * as Phaser from "phaser";
 
 import {
+  calculateLogicalViewport,
   GAME_HEIGHT,
   GAME_WIDTH,
   RENDER_HEIGHT,
@@ -8,11 +9,21 @@ import {
   RENDER_WIDTH,
 } from "./gameDimensions";
 
+export function getLogicalViewport(scene: Phaser.Scene) {
+  return calculateLogicalViewport(
+    scene.scale.gameSize.width,
+    scene.scale.gameSize.height,
+    RENDER_SCALE,
+  );
+}
+
 export function configure2KCamera(scene: Phaser.Scene): void {
+  const viewport = getLogicalViewport(scene);
+
   scene.cameras.main
     .setOrigin(0, 0)
     .setZoom(RENDER_SCALE)
-    .setScroll(0, 0);
+    .setScroll(-viewport.overflowX, -viewport.overflowY);
   scene.cameras.main.disableCull = true;
 }
 
@@ -40,9 +51,11 @@ export function center2KCameraOn(
   y: number,
 ): void {
   const camera = scene.cameras.main;
+  const viewportWidth = camera.width / camera.zoom;
+  const viewportHeight = camera.height / camera.zoom;
   camera.setScroll(
-    camera.clampX(x - GAME_WIDTH / 2),
-    camera.clampY(y - GAME_HEIGHT / 2),
+    camera.clampX(x - viewportWidth / 2),
+    camera.clampY(y - viewportHeight / 2),
   );
 }
 
@@ -53,8 +66,8 @@ export function follow2KCameraOnStep(
   lerp = 0.12,
 ): void {
   const camera = scene.cameras.main;
-  const targetX = camera.clampX(x - GAME_WIDTH / 2);
-  const targetY = camera.clampY(y - GAME_HEIGHT / 2);
+  const targetX = camera.clampX(x - camera.width / camera.zoom / 2);
+  const targetY = camera.clampY(y - camera.height / camera.zoom / 2);
 
   camera.setScroll(
     Phaser.Math.Linear(camera.scrollX, targetX, lerp),
@@ -69,11 +82,13 @@ export function pan2KCameraOn(
   duration: number,
 ): void {
   const camera = scene.cameras.main;
+  const viewportWidth = camera.width / camera.zoom;
+  const viewportHeight = camera.height / camera.zoom;
 
   scene.tweens.add({
     targets: camera,
-    scrollX: camera.clampX(x - GAME_WIDTH / 2),
-    scrollY: camera.clampY(y - GAME_HEIGHT / 2),
+    scrollX: camera.clampX(x - viewportWidth / 2),
+    scrollY: camera.clampY(y - viewportHeight / 2),
     duration,
     ease: "Sine.easeInOut",
   });

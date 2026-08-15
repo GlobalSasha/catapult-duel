@@ -20,9 +20,12 @@ import {
   isMatchPlacement,
   type MatchPlacement,
 } from "../core/placement";
-import { GAME_HEIGHT, GAME_WIDTH } from "../gameDimensions";
 import { STRINGS_RU } from "../i18n/strings.ru";
-import { configure2KCamera, sharpenSceneText } from "../rendering";
+import {
+  configure2KCamera,
+  getLogicalViewport,
+  sharpenSceneText,
+} from "../rendering";
 import { RETRO_UI } from "../ui/retroTheme";
 import { musicController } from "../audio/MusicController";
 
@@ -86,16 +89,36 @@ export class ResultScene extends Phaser.Scene {
   }
 
   private drawBackdrop(): void {
+    const viewport = getLogicalViewport(this);
+    const backdropX = -viewport.overflowX;
     this.add
-      .image(0, 0, getArenaDefinition(this.arenaId).textureKey)
+      .image(
+        backdropX,
+        -viewport.overflowY,
+        getArenaDefinition(this.arenaId).textureKey,
+      )
       .setOrigin(0)
-      .setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
+      .setDisplaySize(viewport.width, viewport.height)
       .setTint(0xc4774f);
     this.add
-      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, COLORS.background, 0.68)
+      .rectangle(
+        backdropX,
+        -viewport.overflowY,
+        viewport.width,
+        viewport.height,
+        COLORS.background,
+        0.68,
+      )
       .setOrigin(0);
     this.add
-      .rectangle(0, 0, GAME_WIDTH, 240, RETRO_UI.colors.orangeDark, 0.2)
+      .rectangle(
+        backdropX,
+        0,
+        viewport.width,
+        240,
+        RETRO_UI.colors.orangeDark,
+        0.2,
+      )
       .setOrigin(0);
   }
 

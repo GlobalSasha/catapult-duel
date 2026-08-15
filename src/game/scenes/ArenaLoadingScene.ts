@@ -12,7 +12,11 @@ import {
 } from "../core/matchSession";
 import { GAME_HEIGHT, GAME_WIDTH } from "../gameDimensions";
 import { getOpponentDefinition } from "../opponents/opponentCatalog";
-import { configure2KCamera, sharpenSceneText } from "../rendering";
+import {
+  configure2KCamera,
+  getLogicalViewport,
+  sharpenSceneText,
+} from "../rendering";
 import { RETRO_UI } from "../ui/retroTheme";
 
 interface ArenaLoadingSceneData {
@@ -68,6 +72,8 @@ export class ArenaLoadingScene extends Phaser.Scene {
   }
 
   private drawScreen(): void {
+    const viewport = getLogicalViewport(this);
+    const backdropX = -viewport.overflowX;
     const arena = getArenaDefinition(this.arenaId);
     const settings = readMatchSettings(
       this.registry.get(MATCH_SETTINGS_REGISTRY_KEY),
@@ -76,7 +82,7 @@ export class ArenaLoadingScene extends Phaser.Scene {
 
     const background = this.add
       .image(GAME_WIDTH / 2, GAME_HEIGHT / 2, arena.textureKey)
-      .setDisplaySize(GAME_WIDTH * 1.06, GAME_HEIGHT * 1.06)
+      .setDisplaySize(viewport.width * 1.06, viewport.height * 1.06)
       .setTint(0xe9c09c);
     this.tweens.add({
       targets: background,
@@ -87,7 +93,14 @@ export class ArenaLoadingScene extends Phaser.Scene {
     });
 
     this.add
-      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, RETRO_UI.colors.ink, 0.48)
+      .rectangle(
+        backdropX,
+        -viewport.overflowY,
+        viewport.width,
+        viewport.height,
+        RETRO_UI.colors.ink,
+        0.48,
+      )
       .setOrigin(0);
     const shade = this.add.graphics();
     shade.fillGradientStyle(
@@ -100,7 +113,12 @@ export class ArenaLoadingScene extends Phaser.Scene {
       0.92,
       0.28,
     );
-    shade.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    shade.fillRect(
+      backdropX,
+      -viewport.overflowY,
+      viewport.width,
+      viewport.height,
+    );
 
     const frame = this.add.graphics();
     frame.lineStyle(5, RETRO_UI.colors.ink, 0.95);

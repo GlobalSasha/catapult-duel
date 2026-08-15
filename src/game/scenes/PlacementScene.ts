@@ -29,6 +29,7 @@ import {
 import {
   center2KCameraOn,
   configure2KCamera,
+  getLogicalViewport,
   set2KCameraBounds,
   sharpenSceneText,
 } from "../rendering";
@@ -68,6 +69,7 @@ export class PlacementScene extends Phaser.Scene {
   private dynamicObjects: Phaser.GameObjects.GameObject[] = [];
   private statusMessage: string = STRINGS_RU.placementRecommended;
   private handoffContinue?: () => void;
+  private uiOffsetX = 0;
 
   constructor() {
     super("PlacementScene");
@@ -75,6 +77,7 @@ export class PlacementScene extends Phaser.Scene {
 
   create(data: PlacementSceneData): void {
     configure2KCamera(this);
+    this.uiOffsetX = getLogicalViewport(this).overflowX;
     musicController.setTheme("placement");
     this.matchSettings = readMatchSettings(
       this.registry.get(MATCH_SETTINGS_REGISTRY_KEY),
@@ -140,16 +143,22 @@ export class PlacementScene extends Phaser.Scene {
     this.add
       .rectangle(0, 0, GAME_WIDTH, 150, COLORS.navy, 0.88)
       .setOrigin(0)
+      .setX(this.uiOffsetX)
       .setScrollFactor(0)
       .setDepth(900);
     this.add
       .rectangle(0, 700, GAME_WIDTH, 200, COLORS.navy, 0.96)
       .setOrigin(0)
+      .setX(this.uiOffsetX)
       .setScrollFactor(0)
       .setDepth(900)
       .setStrokeStyle(RETRO_UI.line.selected, COLORS.panelStroke, 0.88);
 
-    const panelWear = this.add.graphics().setScrollFactor(0).setDepth(901);
+    const panelWear = this.add
+      .graphics()
+      .setX(this.uiOffsetX)
+      .setScrollFactor(0)
+      .setDepth(901);
     panelWear.lineStyle(3, COLORS.amber, 0.72);
     panelWear.lineBetween(0, 154, GAME_WIDTH, 154);
     panelWear.lineBetween(0, 704, GAME_WIDTH, 704);
@@ -507,9 +516,13 @@ export class PlacementScene extends Phaser.Scene {
   private trackUi<
     T extends Phaser.GameObjects.GameObject &
       Phaser.GameObjects.Components.ScrollFactor &
-      Phaser.GameObjects.Components.Depth,
+      Phaser.GameObjects.Components.Depth &
+      Phaser.GameObjects.Components.Transform,
   >(object: T): T {
-    object.setScrollFactor(0).setDepth(1000);
+    object
+      .setX(object.x + this.uiOffsetX)
+      .setScrollFactor(0)
+      .setDepth(1000);
     return this.track(object);
   }
 
@@ -605,7 +618,7 @@ export class PlacementScene extends Phaser.Scene {
   private showHandoff(): void {
     const centerX = GAME_WIDTH / 2;
     const cover = this.add
-      .container(0, 0)
+      .container(this.uiOffsetX, 0)
       .setScrollFactor(0)
       .setDepth(2000);
     const background = this.add

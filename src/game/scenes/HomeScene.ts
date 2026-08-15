@@ -13,13 +13,15 @@ import {
   type MatchSettings,
 } from "../core/matchSession";
 import {
-  GAME_HEIGHT,
-  GAME_WIDTH,
   IS_MOBILE_RENDER_TARGET,
   RENDER_HEIGHT,
   RENDER_WIDTH,
 } from "../gameDimensions";
-import { configure2KCamera, sharpenSceneText } from "../rendering";
+import {
+  configure2KCamera,
+  getLogicalViewport,
+  sharpenSceneText,
+} from "../rendering";
 import { RETRO_UI } from "../ui/retroTheme";
 import { musicController } from "../audio/MusicController";
 import {
@@ -100,13 +102,23 @@ export class HomeScene extends Phaser.Scene {
   }
 
   private drawBackdrop(): void {
+    const viewport = getLogicalViewport(this);
+    const backdropX = -viewport.overflowX;
+
     this.add
-      .image(0, 0, "arena-highlands")
+      .image(backdropX, -viewport.overflowY, "arena-highlands")
       .setOrigin(0)
-      .setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
+      .setDisplaySize(viewport.width, viewport.height)
       .setTint(0xc6784f);
     this.add
-      .rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT, COLORS.navy, 0.58)
+      .rectangle(
+        backdropX,
+        -viewport.overflowY,
+        viewport.width,
+        viewport.height,
+        COLORS.navy,
+        0.58,
+      )
       .setOrigin(0);
     const atmosphere = this.add.graphics();
     atmosphere.fillGradientStyle(
@@ -119,11 +131,16 @@ export class HomeScene extends Phaser.Scene {
       0.16,
       0.16,
     );
-    atmosphere.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    atmosphere.fillRect(
+      backdropX,
+      -viewport.overflowY,
+      viewport.width,
+      viewport.height,
+    );
     atmosphere.fillStyle(COLORS.navy, 0.86);
-    atmosphere.fillRect(0, 0, GAME_WIDTH, 184);
+    atmosphere.fillRect(backdropX, 0, viewport.width, 184);
     atmosphere.fillStyle(COLORS.amber, 0.9);
-    atmosphere.fillRect(0, 180, GAME_WIDTH, 4);
+    atmosphere.fillRect(backdropX, 180, viewport.width, 4);
 
     for (let index = 0; index < 24; index += 1) {
       const mote = this.add
