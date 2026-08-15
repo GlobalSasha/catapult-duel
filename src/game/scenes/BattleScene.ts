@@ -97,8 +97,6 @@ interface BattleSceneData {
 
 interface DestructibleView {
   body: Phaser.GameObjects.Graphics | Phaser.GameObjects.Image;
-  damageOverlay: Phaser.GameObjects.Graphics;
-  cracks: Phaser.GameObjects.Graphics;
   impactMarks: Phaser.GameObjects.Graphics;
   impactMarkCount: number;
   durabilityBackground: Phaser.GameObjects.Rectangle;
@@ -987,8 +985,6 @@ export class BattleScene extends Phaser.Scene {
     body: Phaser.GameObjects.Graphics | Phaser.GameObjects.Image,
     accentColor: number,
   ): void {
-    const damageOverlay = this.add.graphics().setDepth(8);
-    const cracks = this.add.graphics().setDepth(9);
     const impactMarks = this.add.graphics().setDepth(10);
     const durabilityBackground = this.add
       .rectangle(x, y - 14, width, 7, 0x111a28, 0.92)
@@ -1015,8 +1011,6 @@ export class BattleScene extends Phaser.Scene {
     durabilityFill.setVisible(false);
     this.destructibleViews.set(id, {
       body,
-      damageOverlay,
-      cracks,
       impactMarks,
       impactMarkCount: 0,
       durabilityBackground,
@@ -1044,8 +1038,7 @@ export class BattleScene extends Phaser.Scene {
     const destroyed = durability === 0;
     const damaged = ratio < 1 && !destroyed;
 
-    view.body.setVisible(!destroyed).setAlpha(0.58 + ratio * 0.42);
-    view.damageOverlay.clear().setVisible(damaged);
+    view.body.setVisible(!destroyed).setAlpha(1);
     view.impactMarks.setVisible(!destroyed);
     view.rubble.setVisible(destroyed);
     view.durabilityBackground.setVisible(damaged);
@@ -1053,55 +1046,6 @@ export class BattleScene extends Phaser.Scene {
       .setVisible(damaged)
       .setDisplaySize(view.width * ratio, 5)
       .setFillStyle(ratio > 0.4 ? 0xffd166 : 0xff7043, 1);
-    view.cracks.clear().setVisible(damaged);
-
-    if (!damaged) {
-      return;
-    }
-
-    const damageStage = ratio > 0.66 ? 1 : ratio > 0.33 ? 2 : 3;
-    view.damageOverlay.fillStyle(0x101315, 0.28 + damageStage * 0.14);
-    view.damageOverlay.fillTriangle(
-      view.x + view.width * 0.08,
-      view.y + view.height * (0.22 + damageStage * 0.08),
-      view.x + view.width * (0.22 + damageStage * 0.06),
-      view.y + view.height * 0.48,
-      view.x + view.width * 0.12,
-      view.y + view.height * 0.7,
-    );
-    if (damageStage >= 2) {
-      view.damageOverlay.fillStyle(0xb85b2f, 0.5);
-      view.damageOverlay.fillRect(
-        view.x + view.width * 0.54,
-        view.y + view.height * 0.18,
-        view.width * 0.1,
-        view.height * 0.54,
-      );
-    }
-    if (damageStage === 3) {
-      view.damageOverlay.fillStyle(0x090b0c, 0.82);
-      view.damageOverlay.fillTriangle(
-        view.x + view.width * 0.58,
-        view.y + view.height * 0.58,
-        view.x + view.width * 0.94,
-        view.y + view.height * 0.44,
-        view.x + view.width * 0.84,
-        view.y + view.height * 0.9,
-      );
-    }
-
-    const crackCount = damageStage * 2;
-    view.cracks.lineStyle(4, 0x111a28, 0.82);
-    for (let index = 0; index < crackCount; index += 1) {
-      const crackX = view.x + view.width * (0.28 + index * 0.22);
-      const crackY = view.y + view.height * (0.2 + (index % 2) * 0.18);
-      view.cracks.beginPath();
-      view.cracks.moveTo(crackX, crackY);
-      view.cracks.lineTo(crackX - 8, crackY + 18);
-      view.cracks.lineTo(crackX + 5, crackY + 31);
-      view.cracks.lineTo(crackX - 4, crackY + 47);
-      view.cracks.strokePath();
-    }
   }
 
   private drawHeader(): void {
@@ -2828,15 +2772,14 @@ export class BattleScene extends Phaser.Scene {
       event.targetKind === "protection" ? "БАШНЯ" : "ОБЪЕКТ";
     const flash = view
       ? this.add
-          .rectangle(
-            view.x + view.width / 2,
-            view.y + view.height / 2,
-            view.width + 12,
-            view.height + 12,
+          .circle(
+            event.x,
+            event.y,
+            18 + Math.min(16, event.amount * 0.45),
             0xffffff,
-            0.72,
+            0.26,
           )
-          .setStrokeStyle(7, RETRO_UI.colors.orange, 1)
+          .setStrokeStyle(3, RETRO_UI.colors.orange, 0.9)
           .setDepth(12)
       : null;
     const label = this.add
@@ -2864,9 +2807,8 @@ export class BattleScene extends Phaser.Scene {
       this.tweens.add({
         targets: flash,
         alpha: 0,
-        scaleX: 1.08,
-        scaleY: 1.04,
-        duration: 260,
+        scale: 1.35,
+        duration: 220,
         ease: "Cubic.easeOut",
         onComplete: () => flash.destroy(),
       });
@@ -2960,8 +2902,8 @@ export class BattleScene extends Phaser.Scene {
     const y = Phaser.Math.Clamp(event.y, view.y + 18, view.y + view.height - 16);
     const rotation = (view.impactMarkCount * 0.91) % (Math.PI * 2);
     const size =
-      (13 + event.intensity * 8) *
-      (event.projectileType === "bomb" ? 1.55 : 1);
+      (9 + event.intensity * 5) *
+      (event.projectileType === "bomb" ? 1.28 : 1);
     view.impactMarkCount += 1;
 
     if (event.projectileType === "fire") {
@@ -2975,49 +2917,38 @@ export class BattleScene extends Phaser.Scene {
     }
 
     if (event.projectileType === "ice") {
-      mark.lineStyle(5, 0x73dfff, 0.78);
-      for (let branch = 0; branch < 6; branch += 1) {
+      mark.lineStyle(2, 0x73dfff, 0.72);
+      for (let branch = 0; branch < 5; branch += 1) {
         const angle = rotation + (Math.PI * 2 * branch) / 6;
         mark.lineBetween(
           x,
           y,
-          x + Math.cos(angle) * size,
-          y + Math.sin(angle) * size,
+          x + Math.cos(angle) * size * 0.7,
+          y + Math.sin(angle) * size * 0.7,
         );
       }
       mark.fillStyle(0xe8fbff, 0.9);
-      mark.fillTriangle(
-        x,
-        y - size * 0.55,
-        x + size * 0.35,
-        y + size * 0.25,
-        x - size * 0.28,
-        y + size * 0.2,
-      );
+      mark.fillCircle(x, y, Math.max(2, size * 0.18));
       return;
     }
 
     const craterSize =
-      event.projectileType === "diamond" ? size * 0.52 : size * 0.68;
+      event.projectileType === "diamond" ? size * 0.42 : size * 0.55;
     mark.fillStyle(
       event.projectileType === "bomb" ? 0x120d0b : 0x27231f,
       0.88,
     );
     mark.fillCircle(x, y, craterSize);
     mark.lineStyle(
-      event.projectileType === "diamond" ? 3 : 4,
+      2,
       event.projectileType === "diamond" ? 0xbff6ff : 0x171411,
       0.94,
     );
     const branches =
-      event.projectileType === "bomb"
-        ? 9
-        : event.projectileType === "diamond"
-          ? 7
-          : 5;
+      event.projectileType === "bomb" ? 5 : 3;
     for (let branch = 0; branch < branches; branch += 1) {
       const angle = rotation + (Math.PI * 2 * branch) / branches;
-      const length = size * (0.85 + (branch % 3) * 0.22);
+      const length = size * (0.48 + (branch % 2) * 0.14);
       const midX = x + Math.cos(angle + 0.16) * length * 0.46;
       const midY = y + Math.sin(angle + 0.16) * length * 0.46;
       mark.beginPath();
