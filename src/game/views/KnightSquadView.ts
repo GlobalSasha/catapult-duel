@@ -11,6 +11,7 @@ export class KnightSquadView {
     left: ["royal-swordswoman", "royal-spearman", "royal-ranger"],
     right: ["raider-axeman", "raider-captain", "raider-scout"],
   } as const;
+  private static readonly IDLE_FRAMES = [0, 1, 7] as const;
 
   private readonly container: Phaser.GameObjects.Container;
   private readonly fighters: Phaser.GameObjects.Sprite[];
@@ -50,22 +51,21 @@ export class KnightSquadView {
 
       const baseY = index === 1 ? 4 : 0;
       const fighter = scene.add
-        .sprite(offsets[index], baseY, unitKey, index * 2)
+        .sprite(
+          offsets[index],
+          baseY,
+          unitKey,
+          KnightSquadView.IDLE_FRAMES[index] ?? 0,
+        )
         .setOrigin(0.5, 0.9)
         .setScale(index === 1 ? 0.54 : 0.5)
         .setFlipX(state.ownerId === "right");
-      fighter.setData("baseY", baseY);
       fighter.setData("animationKey", animationKey);
+      fighter.setData(
+        "idleFrame",
+        KnightSquadView.IDLE_FRAMES[index] ?? 0,
+      );
       fighter.anims.timeScale = [0.92, 0.82, 1.08][index] ?? 1;
-      scene.tweens.add({
-        targets: fighter,
-        y: baseY - (index === 1 ? 2.5 : 1.5),
-        duration: 880 + index * 130,
-        delay: index * 170,
-        ease: "Sine.easeInOut",
-        yoyo: true,
-        repeat: -1,
-      });
       return fighter;
     });
 
@@ -139,8 +139,8 @@ export class KnightSquadView {
       ease: "Linear",
       onComplete: () => {
         this.container.setAngle(0);
-        this.fighters.forEach((fighter, index) => {
-          fighter.stop().setFrame((index * 2) % 8);
+        this.fighters.forEach((fighter) => {
+          fighter.stop().setFrame(fighter.getData("idleFrame") as number);
         });
       },
     });
