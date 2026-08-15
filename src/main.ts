@@ -23,7 +23,20 @@ const fullscreenHint = document.querySelector<HTMLElement>("#fullscreen-hint");
 const fullscreenHintClose = document.querySelector<HTMLButtonElement>(
   "#fullscreen-hint-close",
 );
+const installHint = document.querySelector<HTMLElement>("#install-hint");
+const installConfirm = document.querySelector<HTMLButtonElement>(
+  "#install-confirm",
+);
+const installDismiss = document.querySelector<HTMLButtonElement>(
+  "#install-dismiss",
+);
 let fullscreenHintTimer: number | undefined;
+let installPrompt: BeforeInstallPromptEvent | null = null;
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+}
 
 interface WebkitDocument extends Document {
   webkitFullscreenElement?: Element | null;
@@ -168,6 +181,34 @@ document.addEventListener("webkitfullscreenchange", () => {
   }
 });
 updateFullscreenButton();
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  installPrompt = event as BeforeInstallPromptEvent;
+  if (!isStandalone() && sessionStorage.getItem("install-hint-dismissed") !== "1") {
+    installHint?.classList.add("is-visible");
+  }
+});
+installConfirm?.addEventListener("click", async () => {
+  if (!installPrompt) {
+    return;
+  }
+  await installPrompt.prompt();
+  const choice = await installPrompt.userChoice;
+  if (choice.outcome === "accepted") {
+    installHint?.classList.remove("is-visible");
+  }
+  installPrompt = null;
+});
+installDismiss?.addEventListener("click", () => {
+  installHint?.classList.remove("is-visible");
+  sessionStorage.setItem("install-hint-dismissed", "1");
+});
+window.addEventListener("appinstalled", () => {
+  installPrompt = null;
+  installHint?.classList.remove("is-visible");
+  updateFullscreenButton();
+});
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
