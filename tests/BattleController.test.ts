@@ -46,6 +46,20 @@ const MISS_SHOT: ShotResult = {
   endReason: "ground",
 };
 
+function playMissedTurns(
+  controller: BattleController,
+  turnCount: number,
+): void {
+  for (let index = 0; index < turnCount; index += 1) {
+    const state = controller.getState();
+    expect(controller.fire(createCommand(state.activePlayerId)).ok).toBe(
+      true,
+    );
+    controller.resolveShot(MISS_SHOT);
+    controller.startNextTurn();
+  }
+}
+
 describe("BattleController", () => {
   it("selects a projectile and spends only finite ammunition", () => {
     const controller = new BattleController();
@@ -328,6 +342,87 @@ describe("BattleController", () => {
     expect(newMatch.players.right.health).toBe(
       GAME_CONFIG.catapult.maxHealth,
     );
+  });
+
+  it("moves both knight squads after each full round", () => {
+    const controller = new BattleController();
+    const initial = controller.getState();
+
+    playMissedTurns(controller, 2);
+
+    const state = controller.getState();
+    expect(state.knightSquads.left.progress).toBe(1);
+    expect(state.knightSquads.right.progress).toBe(1);
+    expect(state.knightSquads.left.x).toBeGreaterThan(
+      initial.knightSquads.left.x,
+    );
+    expect(state.knightSquads.right.x).toBeLessThan(
+      initial.knightSquads.right.x,
+    );
+  });
+
+  it("finishes as a draw when both squads complete ten rounds", () => {
+    const controller = new BattleController();
+
+    playMissedTurns(controller, 20);
+
+    expect(controller.getState()).toMatchObject({
+      phase: "finished",
+      winnerId: null,
+      isDraw: true,
+      victoryReason: "knights",
+      knightSquads: {
+        left: { progress: 10 },
+        right: { progress: 10 },
+      },
+    });
+  });
+
+  it("awards a knight victory to the only surviving squad", () => {
+    const state = createInitialBattleState();
+    state.knightSquads.right.health = 0;
+    const controller = new BattleController(state);
+
+    playMissedTurns(controller, 20);
+
+    expect(controller.getState()).toMatchObject({
+      phase: "finished",
+      winnerId: "left",
+      isDraw: false,
+      victoryReason: "knights",
+    });
+    expect(controller.getState().knightSquads.right.progress).toBe(0);
+  });
+
+  it("damages a knight squad and keeps destroyed squads stationary", () => {
+    const controller = new BattleController();
+    const fired = controller.fire(createCommand());
+    expect(fired.ok).toBe(true);
+    const transition = controller.resolveShot({
+      projectileType: "stone",
+      points: [],
+      impact: null,
+      knightImpact: {
+        targetId: "right",
+        x: 1000,
+        y: 700,
+        impactSpeed: 1000,
+        damage: GAME_CONFIG.knights.maxHealth,
+      },
+      endReason: "knight-impact",
+    });
+
+    expect(transition.state.knightSquads.right.health).toBe(0);
+    expect(transition.events).toContainEqual(
+      expect.objectContaining({
+        kind: "knight-damage",
+        targetId: "right",
+        health: 0,
+      }),
+    );
+    controller.startNextTurn();
+    playMissedTurns(controller, 1);
+    expect(controller.getState().knightSquads.right.progress).toBe(0);
   });
 
   it("throws only when an internal transition invariant is violated", () => {

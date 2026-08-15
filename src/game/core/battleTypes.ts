@@ -34,6 +34,16 @@ export interface PlayerState {
   effects: PlayerStatusEffects;
 }
 
+export interface KnightSquadState {
+  ownerId: PlayerId;
+  health: number;
+  progress: number;
+  x: number;
+  y: number;
+}
+
+export type VictoryReason = "catapult" | "knights";
+
 export interface BattleState {
   arenaId: ArenaId;
   matchSeed: number;
@@ -43,7 +53,10 @@ export interface BattleState {
   activePlayerId: PlayerId;
   turnNumber: number;
   players: Record<PlayerId, PlayerState>;
+  knightSquads: Record<PlayerId, KnightSquadState>;
   protections: ProtectionState[];
   obstacles: Record<string, ArenaObstacleState>;
   winnerId: PlayerId | null;
+  isDraw: boolean;
+  victoryReason: VictoryReason | null;
 }

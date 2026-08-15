@@ -18,6 +18,7 @@ import type {
 } from "./shotTypes";
 import { advanceWeather } from "./weather";
 import { cloneMatchPlacement } from "./placement";
+import { getArenaDefinition, getTerrainHeightAt } from "../arena/arenaCatalog";
 
 export type FireErrorReason =
   | "wrong-phase"
@@ -101,11 +102,81 @@ function cloneBattleState(state: BattleState): BattleState {
         effects: { ...state.players.right.effects },
       },
     },
+    knightSquads: {
+      left: { ...state.knightSquads.left },
+      right: { ...state.knightSquads.right },
+    },
   };
 }
 
 function getNextPlayerId(playerId: PlayerId): PlayerId {
   return playerId === "left" ? "right" : "left";
+}
+
+function advanceKnightSquads(
+  state: BattleState,
+  events: BattleTransition["events"],
+): void {
+  const arena = getArenaDefinition(state.arenaId);
+
+  (["left", "right"] as const).forEach((playerId) => {
+    const squad = state.knightSquads[playerId];
+
+    if (
+      squad.health === 0 ||
+      squad.progress >= GAME_CONFIG.knights.stepsToVictory
+    ) {
+      return;
+    }
+
+    const direction = playerId === "left" ? 1 : -1;
+    const opponentId = getNextPlayerId(playerId);
+    const startX =
+      state.players[playerId].catapultX +
+      direction * GAME_CONFIG.knights.spawnOffset;
+    const targetX =
+      state.players[opponentId].catapultX -
+      direction * GAME_CONFIG.knights.targetOffset;
+    const fromX = squad.x;
+    const fromY = squad.y;
+    squad.progress = Math.min(
+      GAME_CONFIG.knights.stepsToVictory,
+      squad.progress + 1,
+    );
+    squad.x =
+      startX +
+      (targetX - startX) *
+        (squad.progress / GAME_CONFIG.knights.stepsToVictory);
+    squad.y = getTerrainHeightAt(arena.terrain, squad.x);
+    events.push({
+      kind: "knight-move",
+      targetId: playerId,
+      fromX,
+      fromY,
+      toX: squad.x,
+      toY: squad.y,
+      progress: squad.progress,
+    });
+  });
+}
+
+function resolveKnightArrival(state: BattleState): void {
+  const arrived = (["left", "right"] as const).filter((playerId) => {
+    const squad = state.knightSquads[playerId];
+    return (
+      squad.health > 0 &&
+      squad.progress >= GAME_CONFIG.knights.stepsToVictory
+    );
+  });
+
+  if (arrived.length === 0) {
+    return;
+  }
+
+  state.phase = "finished";
+  state.victoryReason = "knights";
+  state.isDraw = arrived.length === 2;
+  state.winnerId = arrived.length === 1 ? arrived[0] ?? null : null;
 }
 
 function isWithinRange(
@@ -285,6 +356,8 @@ export class BattleController {
           ...transition.state,
           phase: "finished",
           winnerId: getNextPlayerId(defeatedPlayer),
+          isDraw: false,
+          victoryReason: "catapult",
         }
       : {
           ...transition.state,
@@ -311,20 +384,31 @@ export class BattleController {
       outgoingPlayerId,
     );
 
-    this.state =
-      transition.state.players[outgoingPlayerId].health === 0
-        ? {
-            ...transition.state,
-            phase: "finished",
-            winnerId: nextPlayerId,
-          }
-        : {
-            ...transition.state,
-            phase: "aiming",
-            activePlayerId: nextPlayerId,
-            turnNumber: this.state.turnNumber + 1,
-            weather: advanceWeather(transition.state.weather),
-          };
+    if (transition.state.players[outgoingPlayerId].health === 0) {
+      this.state = {
+        ...transition.state,
+        phase: "finished",
+        winnerId: nextPlayerId,
+        isDraw: false,
+        victoryReason: "catapult",
+      };
+    } else {
+      if (outgoingPlayerId === "right") {
+        advanceKnightSquads(transition.state, transition.events);
+        resolveKnightArrival(transition.state);
+      }
+
+      this.state =
+        transition.state.phase === "finished"
+          ? transition.state
+          : {
+              ...transition.state,
+              phase: "aiming",
+              activePlayerId: nextPlayerId,
+              turnNumber: this.state.turnNumber + 1,
+              weather: advanceWeather(transition.state.weather),
+            };
+    }
 
     return {
       state: this.getState(),

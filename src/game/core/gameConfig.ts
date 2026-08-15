@@ -43,6 +43,21 @@ export const GAME_CONFIG = {
     launchOffsetX: 11,
     launchOffsetY: -21,
   },
+  knights: {
+    maxHealth: 75,
+    stepsToVictory: 10,
+    spawnOffset: 150,
+    targetOffset: 100,
+    colliderWidth: 110,
+    colliderHeight: 60,
+    damageCoefficients: {
+      stone: 1,
+      fire: 1.33,
+      ice: 1.25,
+      diamond: 0.75,
+      bomb: 1.15,
+    },
+  },
   repair: {
     healthRatio: 0.25,
   },

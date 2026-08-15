@@ -158,6 +158,7 @@ function getNormalImpactRatio(
 
 type CollisionCandidate =
   | { kind: "target"; hit: SweptCollision }
+  | { kind: "squad"; hit: SweptCollision }
   | {
       kind: "object";
       hit: SweptCollision;
@@ -167,14 +168,16 @@ type CollisionCandidate =
 
 const COLLISION_PRIORITY: Record<CollisionCandidate["kind"], number> = {
   object: 0,
-  target: 1,
-  ground: 2,
+  squad: 1,
+  target: 2,
+  ground: 3,
 };
 
 function getFirstCollision(
   start: FlightPoint,
   end: FlightPoint,
   targetRectangle: { x: number; y: number; width: number; height: number },
+  squadRectangle: { x: number; y: number; width: number; height: number } | null,
   environment: ShotSimulationEnvironment,
   ignoreLaunchOverlap: boolean,
   highestTerrainY: number,
@@ -193,6 +196,19 @@ function getFirstCollision(
 
   if (targetHit) {
     candidates.push({ kind: "target", hit: targetHit });
+  }
+
+  const squadHit = squadRectangle
+    ? sweepCircleAgainstRectangle(
+        start,
+        end,
+        environment.projectileRadius,
+        squadRectangle,
+      )
+    : null;
+
+  if (squadHit) {
+    candidates.push({ kind: "squad", hit: squadHit });
   }
 
   environment.obstacles.forEach((object) => {
@@ -306,6 +322,16 @@ export function simulateShot(
     width: resolvedEnvironment.catapultColliderWidth,
     height: resolvedEnvironment.catapultColliderHeight,
   };
+  const targetSquad = state.knightSquads[targetId];
+  const squadRectangle =
+    targetSquad.health > 0
+      ? {
+          x: targetSquad.x - GAME_CONFIG.knights.colliderWidth / 2,
+          y: targetSquad.y - GAME_CONFIG.knights.colliderHeight,
+          width: GAME_CONFIG.knights.colliderWidth,
+          height: GAME_CONFIG.knights.colliderHeight,
+        }
+      : null;
   const highestTerrainY = Math.min(
     ...resolvedEnvironment.terrain.map(({ y: terrainY }) => terrainY),
   );
@@ -336,6 +362,7 @@ export function simulateShot(
       previousPoint,
       point,
       targetRectangle,
+      squadRectangle,
       resolvedEnvironment,
       step <= 2,
       highestTerrainY,
@@ -411,6 +438,45 @@ export function simulateShot(
         },
         objectImpact: null,
         endReason: "impact",
+      };
+    }
+
+
+    if (collision?.kind === "squad") {
+      const impactSpeed = Math.hypot(velocityX, velocityY);
+      const projectile = GAME_CONFIG.projectiles[command.projectileType];
+      const normalImpactRatio = getNormalImpactRatio(
+        velocityX,
+        velocityY,
+        collision.hit.normalX,
+        collision.hit.normalY,
+      );
+
+      return {
+        projectileType: command.projectileType,
+        points,
+        impact: null,
+        knightImpact: {
+          targetId,
+          x: collision.hit.contactX,
+          y: collision.hit.contactY,
+          impactSpeed,
+          velocityX,
+          velocityY,
+          normalImpactRatio,
+          damage: calculatePhysicalImpactDamage({
+            baseDamage: projectile.baseDamage,
+            impactSpeed,
+            relativeMass: projectile.relativeMass,
+            normalImpactRatio,
+            materialCoefficient:
+              GAME_CONFIG.knights.damageCoefficients[
+                command.projectileType
+              ],
+          }),
+        },
+        objectImpact: null,
+        endReason: "knight-impact",
       };
     }
 

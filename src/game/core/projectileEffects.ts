@@ -53,6 +53,10 @@ function cloneBattleState(state: BattleState): BattleState {
         effects: { ...state.players.right.effects },
       },
     },
+    knightSquads: {
+      left: { ...state.knightSquads.left },
+      right: { ...state.knightSquads.right },
+    },
   };
 }
 
@@ -371,6 +375,55 @@ function applyDirectHit(
   return state.players[shot.impact.targetId];
 }
 
+function applyKnightDamage(
+  state: BattleState,
+  events: BattleEvent[],
+  targetId: PlayerId,
+  amount: number,
+  source: "direct" | "explosion",
+  x: number,
+  y: number,
+): void {
+  const target = state.knightSquads[targetId];
+  const roundedAmount = Math.max(0, Math.round(amount));
+
+  if (target.health === 0 || roundedAmount === 0) {
+    return;
+  }
+
+  const actualDamage = Math.min(target.health, roundedAmount);
+  target.health -= actualDamage;
+  events.push({
+    kind: "knight-damage",
+    targetId,
+    amount: actualDamage,
+    health: target.health,
+    source,
+    x,
+    y,
+  });
+}
+
+function applyDirectKnightHit(
+  state: BattleState,
+  shot: ShotResult,
+  events: BattleEvent[],
+): void {
+  if (!shot.knightImpact) {
+    return;
+  }
+
+  applyKnightDamage(
+    state,
+    events,
+    shot.knightImpact.targetId,
+    shot.knightImpact.damage,
+    "direct",
+    shot.knightImpact.x,
+    shot.knightImpact.y,
+  );
+}
+
 function rectanglesOverlap(
   a: { x: number; y: number; width: number; height: number },
   b: { x: number; y: number; width: number; height: number },
@@ -536,7 +589,9 @@ function applyBombDisplacement(
 ): void {
   if (
     shot.projectileType !== "bomb" ||
-    !["impact", "ground", "obstacle"].includes(shot.endReason)
+    !["impact", "knight-impact", "ground", "obstacle"].includes(
+      shot.endReason,
+    )
   ) {
     return;
   }
@@ -586,7 +641,9 @@ function applyBombExplosion(
 ): void {
   if (
     shot.projectileType !== "bomb" ||
-    !["impact", "ground", "obstacle"].includes(shot.endReason)
+    !["impact", "knight-impact", "ground", "obstacle"].includes(
+      shot.endReason,
+    )
   ) {
     return;
   }
@@ -620,6 +677,36 @@ function applyBombExplosion(
       events,
       playerId,
       damage,
+      "explosion",
+      explosionPoint.x,
+      explosionPoint.y,
+    );
+  });
+
+  (["left", "right"] as const).forEach((playerId) => {
+    const squad = state.knightSquads[playerId];
+
+    if (squad.health === 0) {
+      return;
+    }
+
+    const distance = Math.hypot(
+      explosionPoint.x - squad.x,
+      explosionPoint.y -
+        (squad.y - GAME_CONFIG.knights.colliderHeight / 2),
+    );
+
+    if (distance >= explosionRadius) {
+      return;
+    }
+
+    applyKnightDamage(
+      state,
+      events,
+      playerId,
+      maxExplosionDamage *
+        (1 - distance / explosionRadius) *
+        GAME_CONFIG.knights.damageCoefficients.bomb,
       "explosion",
       explosionPoint.x,
       explosionPoint.y,
@@ -677,6 +764,10 @@ function getExplosionPoint(
 
   if (shot.objectImpact) {
     return { x: shot.objectImpact.x, y: shot.objectImpact.y };
+  }
+
+  if (shot.knightImpact) {
+    return { x: shot.knightImpact.x, y: shot.knightImpact.y };
   }
 
   const lastPoint = shot.points.at(-1);
@@ -766,6 +857,7 @@ export function resolveProjectileShot(
   const events: BattleEvent[] = [];
   const directTarget = applyDirectHit(nextState, shot, events);
 
+  applyDirectKnightHit(nextState, shot, events);
   applyDirectObjectHit(nextState, shot, events);
   applyStatusEffect(
     directTarget,

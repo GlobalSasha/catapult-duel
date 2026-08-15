@@ -40,7 +40,7 @@ export const STRINGS_RU = {
   },
   menuEyebrow: "КАРТА ВОЕННОЙ КАМПАНИИ",
   menuSubtitle:
-    "Выберите поле боя, рассчитайте траекторию и разрушьте катапульту соперника",
+    "Разрушьте катапульту соперника или проведите рыцарей к его башне",
   chooseArenaTitle: "ВЫБЕРИТЕ АРЕНУ",
   chooseArenaHint: "12 миров · нажмите на карточку или используйте стрелки",
   arenaHighlandsName: "СУМЕРЕЧНЫЕ ВЫСОТЫ",
@@ -143,6 +143,10 @@ export const STRINGS_RU = {
     `Алмазное пробитие · урон ${damage}`,
   bombImpactStatus: (damage: number) =>
     `Взрыв · суммарный урон ${damage}`,
+  knightImpactStatus: (damage: number) =>
+    `Попадание по рыцарям · урон отряду ${damage}`,
+  knightRoundStatus: (roundNumber: number) =>
+    `МАРШ ${Math.min(roundNumber, 10)}/10`,
   burnDamageStatus: (damage: number) =>
     `Горение в конце хода · урон ${damage}`,
   groundStatus: "Снаряд попал в землю · урон 0",
@@ -158,6 +162,9 @@ export const STRINGS_RU = {
   frozenStatus: (turns: number) => `❄ ЗАМОРОЗКА · ${turns}`,
   victoryIcon: "★",
   victoryTitle: "ПОБЕДА",
+  drawTitle: "НИЧЬЯ",
+  drawMessage: "Оба отряда одновременно достигли вражеских башен",
+  victoryByKnights: "Рыцари захватили вражескую башню",
   victoryPlayer: (playerNumber: number) => `ИГРОК ${playerNumber} ПОБЕДИЛ`,
   victoryPlayerName: (playerName: string) =>
     `${playerName.toLocaleUpperCase("ru-RU")} ПОБЕДИЛ`,

@@ -46,8 +46,17 @@ export interface ObjectImpactEvent extends ImpactKinematics {
   impactSpeed: number;
 }
 
+export interface KnightImpactEvent extends ImpactKinematics {
+  targetId: PlayerId;
+  x: number;
+  y: number;
+  impactSpeed: number;
+  damage: number;
+}
+
 export type ShotEndReason =
   | "impact"
+  | "knight-impact"
   | "ground"
   | "obstacle"
   | "out-of-bounds"
@@ -57,6 +66,7 @@ export interface ShotResult {
   projectileType: ProjectileType;
   points: FlightPoint[];
   impact: ImpactEvent | null;
+  knightImpact?: KnightImpactEvent | null;
   objectImpact?: ObjectImpactEvent | null;
   endReason: ShotEndReason;
 }
@@ -129,13 +139,35 @@ export interface RepairEvent {
   maximumHealth: number;
 }
 
+export interface KnightDamageEvent {
+  kind: "knight-damage";
+  targetId: PlayerId;
+  amount: number;
+  health: number;
+  source: "direct" | "explosion";
+  x: number;
+  y: number;
+}
+
+export interface KnightMoveEvent {
+  kind: "knight-move";
+  targetId: PlayerId;
+  fromX: number;
+  fromY: number;
+  toX: number;
+  toY: number;
+  progress: number;
+}
+
 export type BattleEvent =
   | DamageEvent
   | StatusEvent
   | DurabilityEvent
   | MaterialReactionEvent
   | DisplacementEvent
-  | RepairEvent;
+  | RepairEvent
+  | KnightDamageEvent
+  | KnightMoveEvent;
 
 export interface BattleTransition {
   state: import("./battleTypes").BattleState;

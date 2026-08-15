@@ -63,6 +63,7 @@ import {
 import { RETRO_UI } from "../ui/retroTheme";
 import { musicController } from "../audio/MusicController";
 import { CatapultView } from "../views/CatapultView";
+import { KnightSquadView } from "../views/KnightSquadView";
 import { createCastleAmbientEffects } from "../views/CastleAmbientEffects";
 import {
   createCastleTowerSprite,
@@ -107,6 +108,7 @@ interface DestructibleView {
 export class BattleScene extends Phaser.Scene {
   private battleController = new BattleController();
   private catapultViews!: Record<PlayerId, CatapultView>;
+  private knightSquadViews!: Record<PlayerId, KnightSquadView>;
   private aimingControls!: AimingControls;
   private previewGraphics!: Phaser.GameObjects.Graphics;
   private gestureGuide!: Phaser.GameObjects.Graphics;
@@ -196,6 +198,7 @@ export class BattleScene extends Phaser.Scene {
       },
     });
     this.createCatapultViews();
+    this.createKnightSquadViews();
     this.cameras.main.fadeIn(300, 10, 8, 6);
     this.fogOfWar = this.add.graphics().setDepth(40);
     this.gestureGuide = this.add.graphics().setDepth(16);
@@ -1312,6 +1315,21 @@ export class BattleScene extends Phaser.Scene {
     };
   }
 
+  private createKnightSquadViews(): void {
+    const battleState = this.battleController.getState();
+
+    this.knightSquadViews = {
+      left: new KnightSquadView(
+        this,
+        battleState.knightSquads.left,
+      ),
+      right: new KnightSquadView(
+        this,
+        battleState.knightSquads.right,
+      ),
+    };
+  }
+
   private renderBattleState(): void {
     const battleState = this.battleController.getState();
 
@@ -1327,6 +1345,8 @@ export class BattleScene extends Phaser.Scene {
       battleState.phase === "aiming" &&
         battleState.activePlayerId === "right",
     );
+    this.knightSquadViews.left.update(battleState.knightSquads.left);
+    this.knightSquadViews.right.update(battleState.knightSquads.right);
     const activePlayer = battleState.players[battleState.activePlayerId];
 
     this.aimingControls.setProjectileState(
@@ -1814,8 +1834,17 @@ export class BattleScene extends Phaser.Scene {
     this.renderBattleState();
     this.showBattleEvents(transition.events);
 
-    const impactPoint = shot.impact ?? shot.objectImpact ?? shot.points.at(-1);
-    const explodes = ["impact", "ground", "obstacle"].includes(
+    const impactPoint =
+      shot.impact ??
+      shot.knightImpact ??
+      shot.objectImpact ??
+      shot.points.at(-1);
+    const explodes = [
+      "impact",
+      "knight-impact",
+      "ground",
+      "obstacle",
+    ].includes(
       shot.endReason,
     );
 
@@ -1830,6 +1859,9 @@ export class BattleScene extends Phaser.Scene {
     const totalDamage = transition.events
       .filter((event) => event.kind === "damage")
       .reduce((sum, event) => sum + event.amount, 0);
+    const knightDamage = transition.events
+      .filter((event) => event.kind === "knight-damage")
+      .reduce((sum, event) => sum + event.amount, 0);
     const durabilityEvents = transition.events.filter(
       (event) => event.kind === "durability",
     );
@@ -1841,16 +1873,23 @@ export class BattleScene extends Phaser.Scene {
       (event) => event.destroyed,
     );
 
-    if (shot.impact) {
+    if (shot.knightImpact) {
+      this.statusText.setText(
+        STRINGS_RU.knightImpactStatus(knightDamage),
+      );
+    } else if (shot.impact) {
       this.statusText.setText(
         this.getProjectileImpactStatus(
           shot.projectileType,
           totalDamage,
         ),
       );
-    } else if (shot.projectileType === "bomb" && totalDamage > 0) {
+    } else if (
+      shot.projectileType === "bomb" &&
+      totalDamage + knightDamage > 0
+    ) {
       this.statusText.setText(
-        STRINGS_RU.bombImpactStatus(totalDamage),
+        STRINGS_RU.bombImpactStatus(totalDamage + knightDamage),
       );
     } else if (durabilityDamage > 0) {
       this.statusText.setText(
@@ -1867,10 +1906,15 @@ export class BattleScene extends Phaser.Scene {
       this.statusText.setText(STRINGS_RU.missStatus);
     }
 
-    if (resolvedState.phase === "finished" && resolvedState.winnerId) {
+    if (
+      resolvedState.phase === "finished" &&
+      (resolvedState.winnerId || resolvedState.isDraw)
+    ) {
       this.time.delayedCall(GAME_CONFIG.battle.resultDisplayMs, () => {
         this.scene.start("ResultScene", {
           winnerId: resolvedState.winnerId,
+          isDraw: resolvedState.isDraw,
+          victoryReason: resolvedState.victoryReason,
           turnNumber: resolvedState.turnNumber,
           arenaId: this.arenaId,
           placement: this.matchPlacement,
@@ -1902,7 +1946,10 @@ export class BattleScene extends Phaser.Scene {
       0,
     );
 
-    if (battleState.phase === "finished" && battleState.winnerId) {
+    if (
+      battleState.phase === "finished" &&
+      (battleState.winnerId || battleState.isDraw)
+    ) {
       if (burnDamage > 0) {
         this.statusText.setText(
           STRINGS_RU.burnDamageStatus(burnDamage),
@@ -1911,6 +1958,8 @@ export class BattleScene extends Phaser.Scene {
       this.time.delayedCall(GAME_CONFIG.battle.resultDisplayMs, () => {
         this.scene.start("ResultScene", {
           winnerId: battleState.winnerId,
+          isDraw: battleState.isDraw,
+          victoryReason: battleState.victoryReason,
           turnNumber: battleState.turnNumber,
           arenaId: this.arenaId,
           placement: this.matchPlacement,
@@ -1954,7 +2003,7 @@ export class BattleScene extends Phaser.Scene {
     const battleState = this.battleController.getState();
     const playerName =
       this.matchSettings.playerNames[battleState.activePlayerId];
-    return IS_MOBILE_RENDER_TARGET
+    const aimingStatus = IS_MOBILE_RENDER_TARGET
       ? STRINGS_RU.touchAimingStatusForName(
           battleState.turnNumber,
           playerName,
@@ -1963,6 +2012,9 @@ export class BattleScene extends Phaser.Scene {
           battleState.turnNumber,
           playerName,
         );
+    return `${aimingStatus} · ${STRINGS_RU.knightRoundStatus(
+      battleState.knightSquads.left.progress,
+    )}`;
   }
 
   private isAiTurn(): boolean {
@@ -2036,7 +2088,20 @@ export class BattleScene extends Phaser.Scene {
     const angleStep = difficulty === "hard" ? 2 : difficulty === "normal" ? 4 : 6;
     const powerStep = difficulty === "hard" ? 2 : difficulty === "normal" ? 4 : 7;
     const maximumPower = getPlayerMaximumPower(activePlayer);
-    const targetX = state.players.left.catapultX;
+    const enemySquad = state.knightSquads.left;
+    const remainingRounds =
+      GAME_CONFIG.knights.stepsToVictory - enemySquad.progress;
+    const estimatedAccuracy =
+      difficulty === "easy" ? 0.25 : difficulty === "normal" ? 0.4 : 0.6;
+    const expectedDefenseShots =
+      Math.ceil(enemySquad.health / GAME_CONFIG.projectiles.stone.baseDamage) /
+      estimatedAccuracy;
+    const preferSquad =
+      enemySquad.health > 0 &&
+      expectedDefenseShots >= Math.max(1, remainingRounds - 1);
+    const targetX = preferSquad
+      ? enemySquad.x
+      : state.players.left.catapultX;
     let best: { values: AimingValues; score: number } | undefined;
 
     for (const projectileType of projectileTypes) {
@@ -2048,9 +2113,15 @@ export class BattleScene extends Phaser.Scene {
           );
           const lastPoint = result.points.at(-1);
           const hitScore = result.impact?.targetId === "left" ? 100_000 + result.impact.damage * 500 : 0;
+          const knightHitScore =
+            result.knightImpact?.targetId === "left"
+              ? (preferSquad ? 125_000 : 24_000) +
+                result.knightImpact.damage * 600
+              : 0;
           const obstacleScore = result.objectImpact ? 8_000 : 0;
           const distanceScore = lastPoint ? -Math.abs(lastPoint.x - targetX) : -20_000;
-          const score = hitScore + obstacleScore + distanceScore;
+          const score =
+            hitScore + knightHitScore + obstacleScore + distanceScore;
 
           if (!best || score > best.score) {
             best = {
@@ -2367,6 +2438,9 @@ export class BattleScene extends Phaser.Scene {
     const activePlayerId = this.battleController.getState().activePlayerId;
     const bandWidth = 720;
     const startX = activePlayerId === "left" ? 1500 : 5700;
+    const verticalMargin = GAME_CONFIG.world.verticalOutOfBoundsMargin;
+    const fogTop = -verticalMargin;
+    const fogHeight = GAME_HEIGHT + verticalMargin * 2;
 
     this.fogOfWar.clear().setAlpha(1);
     for (let index = 0; index < 8; index += 1) {
@@ -2376,7 +2450,7 @@ export class BattleScene extends Phaser.Scene {
           ? startX + index * bandWidth
           : startX - (index + 1) * bandWidth;
       this.fogOfWar.fillStyle(0x0b0e10, alpha);
-      this.fogOfWar.fillRect(x, 150, bandWidth + 4, GAME_HEIGHT - 150);
+      this.fogOfWar.fillRect(x, fogTop, bandWidth + 4, fogHeight);
     }
 
     const edgeX = activePlayerId === "left" ? startX : startX - 30;
@@ -2485,6 +2559,16 @@ export class BattleScene extends Phaser.Scene {
         );
       } else if (event.kind === "repair") {
         this.showRepair(event.targetId, event.amount);
+      } else if (event.kind === "knight-move") {
+        this.knightSquadViews[event.targetId].animateMove(
+          event.fromX,
+          event.fromY,
+          event.toX,
+          event.toY,
+        );
+      } else if (event.kind === "knight-damage") {
+        this.knightSquadViews[event.targetId].playImpact(event.health <= 0);
+        this.showKnightDamage(event.targetId, event.amount);
       }
     });
 
@@ -2501,6 +2585,30 @@ export class BattleScene extends Phaser.Scene {
         }
         this.showDamage(playerId, damage);
       }
+    });
+  }
+
+  private showKnightDamage(targetId: PlayerId, damage: number): void {
+    const position = this.knightSquadViews[targetId].getLabelPosition();
+    const label = this.add
+      .text(position.x, position.y, `−${damage} ОТРЯД`, {
+        color: RETRO_UI.text.danger,
+        fontFamily: DISPLAY_FONT,
+        fontSize: "28px",
+        fontStyle: "bold",
+        stroke: RETRO_UI.text.ink,
+        strokeThickness: 6,
+      })
+      .setOrigin(0.5)
+      .setDepth(1100);
+
+    this.tweens.add({
+      targets: label,
+      y: position.y - 65,
+      alpha: 0,
+      duration: 1000,
+      ease: "Cubic.easeOut",
+      onComplete: () => label.destroy(),
     });
   }
 

@@ -50,6 +50,19 @@ export class BootScene extends Phaser.Scene {
     this.load.image("catapult-right-arm", "assets/catapult-right-arm.webp");
     this.load.image("catapult-right-wheel", "assets/catapult-right-wheel.webp");
     this.load.image("castle-tower", "assets/castle-tower.webp");
+    [
+      "royal-swordswoman",
+      "royal-spearman",
+      "royal-ranger",
+      "raider-axeman",
+      "raider-captain",
+      "raider-scout",
+    ].forEach((unitKey) => {
+      this.load.spritesheet(unitKey, `assets/units/${unitKey}.webp`, {
+        frameWidth: 256,
+        frameHeight: 256,
+      });
+    });
     this.load.image(
       "map-highlands-watchtower",
       "assets/map-elements/highlands-watchtower.webp",

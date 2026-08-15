@@ -67,7 +67,11 @@ function parseArgs(argv) {
       if (argument === "--context") {
         options.context.push(...value.split(",").map((item) => item.trim()).filter(Boolean));
       } else {
-        options[argument.slice(2)] = value;
+        const optionName = {
+          "max-tokens": "maxTokens",
+          "max-cost": "maxCost",
+        }[argument.slice(2)] ?? argument.slice(2);
+        options[optionName] = value;
       }
     } else {
       throw new Error(`Неизвестный параметр: ${argument}`);

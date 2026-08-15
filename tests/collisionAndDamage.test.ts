@@ -24,7 +24,10 @@ function createUnprotectedState() {
   const placement = createDefaultMatchPlacement();
   placement.left.protections = [];
   placement.right.protections = [];
-  return createInitialBattleState(undefined, undefined, placement);
+  const state = createInitialBattleState(undefined, undefined, placement);
+  state.knightSquads.left.health = 0;
+  state.knightSquads.right.health = 0;
+  return state;
 }
 
 describe("collision and damage", () => {

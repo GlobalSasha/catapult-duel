@@ -69,9 +69,33 @@ describe("createInitialBattleState", () => {
           },
         },
       },
+      knightSquads: {
+        left: {
+          ownerId: "left",
+          health: GAME_CONFIG.knights.maxHealth,
+          progress: 0,
+          x: arena.spawnX.left + GAME_CONFIG.knights.spawnOffset,
+          y: getTerrainHeightAt(
+            arena.terrain,
+            arena.spawnX.left + GAME_CONFIG.knights.spawnOffset,
+          ),
+        },
+        right: {
+          ownerId: "right",
+          health: GAME_CONFIG.knights.maxHealth,
+          progress: 0,
+          x: arena.spawnX.right - GAME_CONFIG.knights.spawnOffset,
+          y: getTerrainHeightAt(
+            arena.terrain,
+            arena.spawnX.right - GAME_CONFIG.knights.spawnOffset,
+          ),
+        },
+      },
       protections: createDefaultProtections(DEFAULT_ARENA_ID),
       obstacles: createArenaObstacleStates(DEFAULT_ARENA_ID),
       winnerId: null,
+      isDraw: false,
+      victoryReason: null,
     });
   });
 
@@ -80,6 +104,7 @@ describe("createInitialBattleState", () => {
     const secondState = createInitialBattleState();
 
     firstState.players.left.health = 0;
+    firstState.knightSquads.left.health = 0;
     firstState.weather.wind = 999;
     firstState.protections[0]!.durability = 0;
     firstState.obstacles["highlands-center-ridge"]!.durability = 0;
@@ -89,6 +114,9 @@ describe("createInitialBattleState", () => {
     expect(firstState.players.left).not.toBe(secondState.players.left);
     expect(secondState.players.left.health).toBe(
       GAME_CONFIG.catapult.maxHealth,
+    );
+    expect(secondState.knightSquads.left.health).toBe(
+      GAME_CONFIG.knights.maxHealth,
     );
     expect(secondState.weather.wind).not.toBe(999);
     expect(secondState.protections[0]?.durability).toBeGreaterThan(0);

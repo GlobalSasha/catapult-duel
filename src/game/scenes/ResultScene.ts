@@ -6,7 +6,7 @@ import {
   isArenaId,
   type ArenaId,
 } from "../arena/arenaCatalog";
-import type { PlayerId } from "../core/battleTypes";
+import type { PlayerId, VictoryReason } from "../core/battleTypes";
 import {
   MATCH_SETTINGS_REGISTRY_KEY,
   getRatingForPlayer,
@@ -30,7 +30,9 @@ import { RETRO_UI } from "../ui/retroTheme";
 import { musicController } from "../audio/MusicController";
 
 interface ResultSceneData {
-  winnerId: PlayerId;
+  winnerId: PlayerId | null;
+  isDraw?: boolean;
+  victoryReason?: VictoryReason | null;
   turnNumber: number;
   arenaId?: ArenaId;
   placement?: MatchPlacement;
@@ -74,7 +76,9 @@ export class ResultScene extends Phaser.Scene {
     this.matchPlacement = isMatchPlacement(data.placement)
       ? cloneMatchPlacement(data.placement)
       : createDefaultMatchPlacement();
-    recordMatchResult(this.matchSettings, data.winnerId);
+    if (data.winnerId) {
+      recordMatchResult(this.matchSettings, data.winnerId);
+    }
     const playerRating = getRatingForPlayer(
       this.matchSettings.playerNames.left,
     );
@@ -123,7 +127,10 @@ export class ResultScene extends Phaser.Scene {
   }
 
   private drawResultCard(data: ResultSceneData, playerRating: number): void {
-    const winnerName = this.matchSettings.playerNames[data.winnerId];
+    const isDraw = data.isDraw === true || data.winnerId === null;
+    const winnerName = data.winnerId
+      ? this.matchSettings.playerNames[data.winnerId]
+      : "";
     const panel = this.add.graphics();
 
     panel.fillStyle(COLORS.panel, 0.97);
@@ -140,7 +147,7 @@ export class ResultScene extends Phaser.Scene {
     panel.strokeRect(716, 228, 168, 128);
 
     this.add
-      .text(800, 292, STRINGS_RU.victoryIcon, {
+      .text(800, 292, isDraw ? "⚔" : STRINGS_RU.victoryIcon, {
         color: RETRO_UI.text.orange,
         fontFamily: UI_FONT,
         fontSize: "68px",
@@ -148,23 +155,46 @@ export class ResultScene extends Phaser.Scene {
       .setOrigin(0.5);
 
     this.add
-      .text(800, 398, STRINGS_RU.victoryTitle, {
+      .text(
+        800,
+        398,
+        isDraw ? STRINGS_RU.drawTitle : STRINGS_RU.victoryTitle,
+        {
         color: COLORS.amberText,
         fontFamily: DISPLAY_FONT,
         fontSize: "24px",
         fontStyle: "bold",
         letterSpacing: 5,
-      })
+        },
+      )
       .setOrigin(0.5);
 
     this.add
-      .text(800, 455, STRINGS_RU.victoryPlayerName(winnerName), {
+      .text(
+        800,
+        455,
+        isDraw
+          ? STRINGS_RU.drawMessage
+          : STRINGS_RU.victoryPlayerName(winnerName),
+        {
         color: COLORS.primaryText,
         fontFamily: UI_FONT,
         fontSize: "36px",
         fontStyle: "bold",
-      })
+        },
+      )
       .setOrigin(0.5);
+
+    if (!isDraw && data.victoryReason === "knights") {
+      this.add
+        .text(800, 487, STRINGS_RU.victoryByKnights, {
+          color: COLORS.amberText,
+          fontFamily: UI_FONT,
+          fontSize: "15px",
+          fontStyle: "bold",
+        })
+        .setOrigin(0.5);
+    }
 
     this.add
       .text(

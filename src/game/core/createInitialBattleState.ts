@@ -1,4 +1,9 @@
-import type { BattleState, PlayerId, PlayerState } from "./battleTypes";
+import type {
+  BattleState,
+  KnightSquadState,
+  PlayerId,
+  PlayerState,
+} from "./battleTypes";
 import {
   DEFAULT_ARENA_ID,
   getArenaDefinition,
@@ -50,12 +55,35 @@ function createPlayerState(
   };
 }
 
+function createKnightSquadState(
+  ownerId: PlayerId,
+  arenaId: ArenaId,
+  players: Record<PlayerId, PlayerState>,
+): KnightSquadState {
+  const direction = ownerId === "left" ? 1 : -1;
+  const x =
+    players[ownerId].catapultX +
+    direction * GAME_CONFIG.knights.spawnOffset;
+
+  return {
+    ownerId,
+    health: GAME_CONFIG.knights.maxHealth,
+    progress: 0,
+    x,
+    y: getTerrainHeightAt(getArenaDefinition(arenaId).terrain, x),
+  };
+}
+
 export function createInitialBattleState(
   arenaId: ArenaId = DEFAULT_ARENA_ID,
   matchSeed: number = GAME_CONFIG.weather.defaultMatchSeed,
   matchPlacement: MatchPlacement = createDefaultMatchPlacement(),
 ): BattleState {
   const placement = cloneMatchPlacement(matchPlacement);
+  const players = {
+    left: createPlayerState("left", arenaId, placement),
+    right: createPlayerState("right", arenaId, placement),
+  };
 
   return {
     arenaId,
@@ -65,12 +93,15 @@ export function createInitialBattleState(
     phase: GAME_CONFIG.battle.initialPhase,
     activePlayerId: GAME_CONFIG.battle.initialActivePlayerId,
     turnNumber: GAME_CONFIG.battle.initialTurnNumber,
-    players: {
-      left: createPlayerState("left", arenaId, placement),
-      right: createPlayerState("right", arenaId, placement),
+    players,
+    knightSquads: {
+      left: createKnightSquadState("left", arenaId, players),
+      right: createKnightSquadState("right", arenaId, players),
     },
     protections: createDefaultProtections(arenaId, placement),
     obstacles: createArenaObstacleStates(arenaId),
     winnerId: null,
+    isDraw: false,
+    victoryReason: null,
   };
 }

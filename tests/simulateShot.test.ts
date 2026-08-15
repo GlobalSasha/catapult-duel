@@ -42,6 +42,8 @@ function createCalmState() {
 
   state.weather.id = "sandstorm";
   state.weather.wind = 0;
+  state.knightSquads.left.health = 0;
+  state.knightSquads.right.health = 0;
   return state;
 }
 
@@ -126,6 +128,46 @@ describe("calculateLaunchVelocity", () => {
 });
 
 describe("simulateShot", () => {
+  it("hits a living enemy knight squad before the catapult", () => {
+    const state = createCalmState();
+    state.players.right.catapultX = 1_000;
+    state.players.right.catapultY = 550;
+    state.knightSquads.right.x = 200;
+    state.knightSquads.right.y = 550;
+    state.knightSquads.right.health = GAME_CONFIG.knights.maxHealth;
+    const environment: ShotSimulationEnvironment = {
+      ...DEFAULT_SHOT_ENVIRONMENT,
+      stepHz: 120,
+      trajectorySampleHz: 30,
+      gravity: 0,
+      maxFlightSeconds: 0.5,
+      worldWidth: 2_000,
+      worldHeight: 2_000,
+      terrain: [
+        { x: 0, y: 1_900 },
+        { x: 2_000, y: 1_900 },
+      ],
+      obstacles: [],
+      outOfBoundsMargin: 1_000,
+    };
+
+    const result = simulateShot(
+      {
+        ...BASE_COMMAND,
+        angleDeg: 10,
+        power: 100,
+        launchPoint: { x: 0, y: 530 },
+      },
+      state,
+      environment,
+    );
+
+    expect(result.endReason).toBe("knight-impact");
+    expect(result.knightImpact?.targetId).toBe("right");
+    expect(result.knightImpact?.damage).toBeGreaterThan(0);
+    expect(result.impact).toBeNull();
+  });
+
   it("does not tunnel through a thin obstacle between physics samples", () => {
     const state = createCalmState();
     state.players.right.catapultX = 10_000;
