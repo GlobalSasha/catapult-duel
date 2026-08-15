@@ -87,7 +87,7 @@ const COLORS = {
 
 const DISPLAY_FONT = RETRO_UI.font.display;
 const UI_FONT = RETRO_UI.font.ui;
-const BATTLE_HEADER_HEIGHT = 128;
+const BATTLE_HEADER_HEIGHT = 0;
 
 interface BattleSceneData {
   arenaId?: ArenaId;
@@ -299,11 +299,6 @@ export class BattleScene extends Phaser.Scene {
       this.drawAmbientLife(arena);
     }
 
-    this.add
-      .rectangle(0, 0, GAME_WIDTH, BATTLE_HEADER_HEIGHT, RETRO_UI.colors.ink, 0.88)
-      .setOrigin(0)
-      .setScrollFactor(0)
-      .setDepth(800);
   }
 
   private drawWeatherEffects(): void {
@@ -1115,18 +1110,14 @@ export class BattleScene extends Phaser.Scene {
       .setX(this.uiOffsetX)
       .setScrollFactor(0)
       .setDepth(900);
-    frame.lineStyle(RETRO_UI.line.selected, RETRO_UI.colors.orange, 0.9);
-    frame.lineBetween(0, 124, GAME_WIDTH, 124);
-    frame.lineStyle(RETRO_UI.line.hairline, RETRO_UI.colors.border, 0.7);
-    frame.lineBetween(0, 116, GAME_WIDTH, 116);
     frame.fillStyle(RETRO_UI.colors.orange, 1);
-    frame.fillRect(40, 26, 7, 58);
+    frame.fillRect(34, 18, 6, 46);
 
     this.add
-      .text(58 + this.uiOffsetX, 28, STRINGS_RU.gameTitle, {
+      .text(50 + this.uiOffsetX, 20, STRINGS_RU.gameTitle, {
         color: RETRO_UI.text.orange,
         fontFamily: DISPLAY_FONT,
-        fontSize: "30px",
+        fontSize: "25px",
         fontStyle: "bold",
         letterSpacing: 4,
         stroke: RETRO_UI.text.ink,
@@ -1137,10 +1128,10 @@ export class BattleScene extends Phaser.Scene {
       .setDepth(901);
 
     this.add
-      .text(60 + this.uiOffsetX, 66, STRINGS_RU.battleSubtitle, {
+      .text(52 + this.uiOffsetX, 52, STRINGS_RU.battleSubtitle, {
         color: COLORS.secondaryText,
         fontFamily: UI_FONT,
-        fontSize: "11px",
+        fontSize: "9px",
         letterSpacing: 2,
       })
       .setOrigin(0, 0)
@@ -1152,15 +1143,15 @@ export class BattleScene extends Phaser.Scene {
       .setX(this.uiOffsetX)
       .setScrollFactor(0)
       .setDepth(901);
-    badge.fillStyle(COLORS.panel, 0.98);
-    badge.fillRect(1260, 22, 276, 62);
+    badge.fillStyle(COLORS.panel, 0.7);
+    badge.fillRoundedRect(1260, 14, 276, 58, 7);
     badge.lineStyle(RETRO_UI.line.selected, RETRO_UI.colors.ink, 1);
-    badge.strokeRect(1260, 22, 276, 62);
+    badge.strokeRoundedRect(1260, 14, 276, 58, 7);
     badge.lineStyle(RETRO_UI.line.hairline, RETRO_UI.colors.cyan, 0.85);
-    badge.strokeRect(1267, 29, 262, 48);
+    badge.strokeRoundedRect(1267, 21, 262, 44, 5);
 
     this.weatherText = this.add
-      .text(1398 + this.uiOffsetX, 42, "", {
+      .text(1398 + this.uiOffsetX, 34, "", {
         color: COLORS.ready,
         fontFamily: UI_FONT,
         fontSize: "13px",
@@ -1171,7 +1162,7 @@ export class BattleScene extends Phaser.Scene {
       .setDepth(902);
 
     this.windText = this.add
-      .text(1398 + this.uiOffsetX, 66, "", {
+      .text(1398 + this.uiOffsetX, 57, "", {
         color: COLORS.primaryText,
         fontFamily: UI_FONT,
         fontSize: "12px",
@@ -1183,10 +1174,10 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private createStatus(): void {
-    const panelX = 430;
-    const panelY = 140;
-    const panelWidth = 740;
-    const panelHeight = 46;
+    const panelX = 470;
+    const panelY = 18;
+    const panelWidth = 670;
+    const panelHeight = 42;
     const panel = this.add
       .graphics()
       .setX(this.uiOffsetX)
@@ -1214,7 +1205,7 @@ export class BattleScene extends Phaser.Scene {
       .text(800 + this.uiOffsetX, panelY + panelHeight / 2, this.getAimingStatus(), {
         color: COLORS.primaryText,
         fontFamily: UI_FONT,
-        fontSize: "14px",
+        fontSize: "12px",
         fontStyle: "bold",
       })
       .setOrigin(0.5)
@@ -1224,7 +1215,7 @@ export class BattleScene extends Phaser.Scene {
 
   private createWorldRail(): void {
     const railX = 1226;
-    const railY = 96;
+    const railY = 82;
     const railWidth = 250;
     const rail = this.add
       .graphics()
@@ -1232,10 +1223,10 @@ export class BattleScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(905);
 
-    rail.fillStyle(RETRO_UI.colors.ink, 0.95);
-    rail.fillRect(railX, railY, railWidth, 18);
+    rail.fillStyle(RETRO_UI.colors.ink, 0.7);
+    rail.fillRoundedRect(railX, railY, railWidth, 18, 4);
     rail.lineStyle(RETRO_UI.line.hairline, RETRO_UI.colors.border, 0.72);
-    rail.strokeRect(railX, railY, railWidth, 18);
+    rail.strokeRoundedRect(railX, railY, railWidth, 18, 4);
     rail.fillStyle(RETRO_UI.colors.playerLeft, 1);
     rail.fillRect(railX + 4, railY + 4, 10, 10);
     rail.fillStyle(RETRO_UI.colors.playerRight, 1);
