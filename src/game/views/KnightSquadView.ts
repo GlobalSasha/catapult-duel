@@ -10,15 +10,93 @@ import { RETRO_UI } from "../ui/retroTheme";
 
 export const KNIGHT_MARCH_DURATION_MS = 2_800;
 
+const WALK_FRAMES = {
+  "royal-swordswoman-walk-v3": [1, 2, 3, 4, 5, 6, 7, 8],
+  "royal-swordswoman": [0, 1, 2, 3, 4, 5, 6, 7],
+  "royal-spearman": [0, 1, 2, 3, 4, 5, 6, 7],
+  "royal-ranger": [0, 1, 2, 3, 4, 5, 6, 7],
+  "raider-axeman": [0, 1, 2, 3, 4, 5, 6, 7],
+  "raider-captain": [0, 1, 2, 3, 4, 5, 6, 7],
+  "raider-scout": [0, 1, 2, 3, 4, 5, 6, 7],
+} as const;
+
+type UnitKey = keyof typeof WALK_FRAMES;
+
+interface UnitVisualMetadata {
+  readonly idleFrame: number;
+  readonly walkFrames: readonly number[];
+  readonly originY: number;
+  readonly scale: number;
+  readonly stride: number;
+}
+
+const UNIT_METADATA: Record<
+  UnitKey,
+  Omit<UnitVisualMetadata, "walkFrames">
+> = {
+  "royal-swordswoman-walk-v3": {
+    idleFrame: 0,
+    originY: 232 / 256,
+    scale: 0.5,
+    stride: 132,
+  },
+  "royal-swordswoman": {
+    idleFrame: 0,
+    originY: 0.9,
+    scale: 0.5,
+    stride: 96,
+  },
+  "royal-spearman": {
+    idleFrame: 0,
+    originY: 0.9,
+    scale: 0.5,
+    stride: 96,
+  },
+  "royal-ranger": {
+    idleFrame: 0,
+    originY: 0.9,
+    scale: 0.5,
+    stride: 96,
+  },
+  "raider-axeman": {
+    idleFrame: 0,
+    originY: 0.9,
+    scale: 0.5,
+    stride: 96,
+  },
+  "raider-captain": {
+    idleFrame: 0,
+    originY: 0.9,
+    scale: 0.5,
+    stride: 96,
+  },
+  "raider-scout": {
+    idleFrame: 0,
+    originY: 0.9,
+    scale: 0.5,
+    stride: 96,
+  },
+};
+
+function getUnitVisualMetadata(unitKey: UnitKey): UnitVisualMetadata {
+  return {
+    ...UNIT_METADATA[unitKey],
+    walkFrames: WALK_FRAMES[unitKey],
+  };
+}
+
 export class KnightSquadView {
   private static readonly UNIT_KEYS = {
-    left: ["royal-swordswoman", "royal-spearman", "royal-ranger"],
+    left: [
+      "royal-swordswoman-walk-v3",
+      "royal-spearman",
+      "royal-ranger",
+    ],
     right: ["raider-axeman", "raider-captain", "raider-scout"],
   } as const;
   private static readonly IDLE_FRAMES = [0, 2, 4] as const;
   private static readonly PHASE_FRAMES = [0, 2, 4] as const;
   private static readonly OFFSETS = [-58, 0, 58] as const;
-  private static readonly STRIDE_PER_CYCLE = 96;
   private static readonly SURFACE_SAMPLE_STEP = 8;
   private static readonly SLOPE_SAMPLE_OFFSET = 24;
   private static readonly SLOPE_FACTOR = 0.45;
@@ -28,6 +106,7 @@ export class KnightSquadView {
   private readonly terrain: readonly TerrainPoint[];
   private readonly shadows: Phaser.GameObjects.Ellipse[];
   private readonly fighters: Phaser.GameObjects.Sprite[];
+  private readonly unitVisuals: readonly UnitVisualMetadata[];
   private readonly healthFill: Phaser.GameObjects.Rectangle;
   private readonly label: Phaser.GameObjects.Text;
   private lastHealth: number;
@@ -43,25 +122,40 @@ export class KnightSquadView {
         ? RETRO_UI.colors.playerLeft
         : RETRO_UI.colors.playerRight;
     const unitKeys = KnightSquadView.UNIT_KEYS[state.ownerId];
+    this.unitVisuals = unitKeys.map((unitKey, index) => {
+      const visual = getUnitVisualMetadata(unitKey);
+      return {
+        ...visual,
+        idleFrame:
+          index === 0
+            ? visual.idleFrame
+            : KnightSquadView.IDLE_FRAMES[index] ?? visual.idleFrame,
+      };
+    });
     this.shadows = KnightSquadView.OFFSETS.map((offsetX, index) =>
       scene.add
         .ellipse(offsetX, index === 1 ? 2 : 0, 70, 15, 0x07090d, 0.42)
         .setScale(index === 1 ? 1.05 : 0.92),
     );
     this.fighters = unitKeys.map((unitKey, index) => {
+      const visual = this.unitVisuals[index];
+      const scale =
+        index === 1 && unitKey !== "royal-swordswoman-walk-v3"
+          ? 0.54
+          : visual?.scale ?? 0.5;
       const fighter = scene.add
         .sprite(
           KnightSquadView.OFFSETS[index] ?? 0,
           0,
           unitKey,
-          KnightSquadView.IDLE_FRAMES[index] ?? 0,
+          visual?.idleFrame ?? 0,
         )
-        .setOrigin(0.5, 0.9)
-        .setScale(index === 1 ? 0.54 : 0.5)
+        .setOrigin(0.5, visual?.originY ?? 0.9)
+        .setScale(scale)
         .setFlipX(state.ownerId === "right");
       fighter.setData(
         "idleFrame",
-        KnightSquadView.IDLE_FRAMES[index] ?? 0,
+        visual?.idleFrame ?? 0,
       );
       return fighter;
     });
@@ -124,21 +218,22 @@ export class KnightSquadView {
     this.container.setVisible(true);
     const direction = toX >= fromX ? 1 : -1;
     const surfacePathLength = this.getSurfacePathLength(fromX, toX);
-    const cycles = Math.min(
-      5,
-      Math.max(
-        3,
-        Math.round(
-          surfacePathLength / KnightSquadView.STRIDE_PER_CYCLE,
-        ),
+    const cycles = this.unitVisuals.map((visual) =>
+      Math.min(
+        5,
+        Math.max(3, Math.round(surfacePathLength / visual.stride)),
       ),
     );
     const cursor = { progress: 0 };
 
-    this.fighters.forEach((fighter, index) => {
+    this.fighters.forEach((fighter) => {
       fighter.setFlipX(direction < 0);
       fighter.stop();
-      fighter.setFrame(KnightSquadView.PHASE_FRAMES[index] ?? 0);
+    });
+    this.layoutAt(fromX, {
+      travelled: 0,
+      total: surfacePathLength,
+      cycles,
     });
 
     this.scene.tweens.add({
@@ -150,14 +245,12 @@ export class KnightSquadView {
         const progress = Phaser.Math.Clamp(cursor.progress, 0, 1);
         const centerX = Phaser.Math.Linear(fromX, toX, progress);
         const travelled = this.getSurfacePathLength(fromX, centerX);
-        const frameOffset =
-          surfacePathLength === 0
-            ? 0
-            : Math.floor(
-                (travelled / surfacePathLength) * cycles * 8,
-              ) % 8;
 
-        this.layoutAt(centerX, frameOffset);
+        this.layoutAt(centerX, {
+          travelled,
+          total: surfacePathLength,
+          cycles,
+        });
       },
       onComplete: () => {
         this.layoutAt(toX);
@@ -166,11 +259,19 @@ export class KnightSquadView {
     });
   }
 
-  private layoutAt(centerX: number, frameOffset?: number): void {
+  private layoutAt(
+    centerX: number,
+    march?: {
+      travelled: number;
+      total: number;
+      cycles: readonly number[];
+    },
+  ): void {
     const centerY = getTerrainHeightAt(this.terrain, centerX);
     this.container.setPosition(centerX, centerY).setAngle(0);
 
     this.fighters.forEach((fighter, index) => {
+      const visual = this.unitVisuals[index];
       const offsetX = KnightSquadView.OFFSETS[index] ?? 0;
       const worldX = centerX + offsetX;
       const groundY = getTerrainHeightAt(this.terrain, worldX);
@@ -201,16 +302,24 @@ export class KnightSquadView {
         localY + (index === 1 ? 2 : 0),
       );
 
-      if (frameOffset === undefined) {
+      if (!march) {
         fighter
           .stop()
-          .setFrame(KnightSquadView.IDLE_FRAMES[index] ?? 0);
+          .setFrame(visual?.idleFrame ?? 0);
       } else {
-        fighter.setFrame(
-          (frameOffset +
-            (KnightSquadView.PHASE_FRAMES[index] ?? 0)) %
-            8,
-        );
+        const frameOffset =
+          march.total === 0
+            ? 0
+            : Math.floor(
+                (march.travelled / march.total) *
+                  (march.cycles[index] ?? 3) *
+                  8,
+              ) % 8;
+        const phaseOffset = KnightSquadView.PHASE_FRAMES[index] ?? 0;
+        const walkFrames = visual?.walkFrames ?? [0];
+        const frameIndex =
+          (frameOffset + phaseOffset) % walkFrames.length;
+        fighter.setFrame(visual?.walkFrames[frameIndex] ?? 0);
       }
     });
   }

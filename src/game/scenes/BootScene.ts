@@ -50,6 +50,14 @@ export class BootScene extends Phaser.Scene {
     this.load.image("catapult-right-arm", "assets/catapult-right-arm.webp");
     this.load.image("catapult-right-wheel", "assets/catapult-right-wheel.webp");
     this.load.image("castle-tower", "assets/castle-tower.webp");
+    this.load.spritesheet(
+      "royal-swordswoman-walk-v3",
+      "assets/units/royal-swordswoman-walk-v3.png",
+      {
+        frameWidth: 256,
+        frameHeight: 256,
+      },
+    );
     [
       "royal-swordswoman",
       "royal-spearman",
