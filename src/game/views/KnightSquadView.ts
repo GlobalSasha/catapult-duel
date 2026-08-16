@@ -12,6 +12,7 @@ export const KNIGHT_MARCH_DURATION_MS = 2_800;
 
 const WALK_FRAMES = {
   "royal-swordswoman-walk-v3": [1, 2, 3, 4, 5, 6, 7, 8],
+  "royal-spearman-walk-v2": [1, 2, 3, 4, 5, 6, 7, 8],
   "royal-swordswoman": [0, 1, 2, 3, 4, 5, 6, 7],
   "royal-spearman": [0, 1, 2, 3, 4, 5, 6, 7],
   "royal-ranger": [0, 1, 2, 3, 4, 5, 6, 7],
@@ -37,6 +38,12 @@ const UNIT_METADATA: Record<
   "royal-swordswoman-walk-v3": {
     idleFrame: 0,
     originY: 232 / 256,
+    scale: 0.5,
+    stride: 132,
+  },
+  "royal-spearman-walk-v2": {
+    idleFrame: 0,
+    originY: 0.90625,
     scale: 0.5,
     stride: 132,
   },
@@ -85,11 +92,18 @@ function getUnitVisualMetadata(unitKey: UnitKey): UnitVisualMetadata {
   };
 }
 
+function isAuthoredWalkSheet(unitKey: UnitKey): boolean {
+  return (
+    unitKey === "royal-swordswoman-walk-v3" ||
+    unitKey === "royal-spearman-walk-v2"
+  );
+}
+
 export class KnightSquadView {
   private static readonly UNIT_KEYS = {
     left: [
       "royal-swordswoman-walk-v3",
-      "royal-spearman",
+      "royal-spearman-walk-v2",
       "royal-ranger",
     ],
     right: ["raider-axeman", "raider-captain", "raider-scout"],
@@ -127,7 +141,7 @@ export class KnightSquadView {
       return {
         ...visual,
         idleFrame:
-          index === 0
+          isAuthoredWalkSheet(unitKey)
             ? visual.idleFrame
             : KnightSquadView.IDLE_FRAMES[index] ?? visual.idleFrame,
       };
@@ -140,7 +154,7 @@ export class KnightSquadView {
     this.fighters = unitKeys.map((unitKey, index) => {
       const visual = this.unitVisuals[index];
       const scale =
-        index === 1 && unitKey !== "royal-swordswoman-walk-v3"
+        index === 1 && !isAuthoredWalkSheet(unitKey)
           ? 0.54
           : visual?.scale ?? 0.5;
       const fighter = scene.add

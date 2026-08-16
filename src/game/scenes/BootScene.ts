@@ -58,6 +58,14 @@ export class BootScene extends Phaser.Scene {
         frameHeight: 256,
       },
     );
+    this.load.spritesheet(
+      "royal-spearman-walk-v2",
+      "assets/units/royal-spearman-walk-v2.png",
+      {
+        frameWidth: 256,
+        frameHeight: 256,
+      },
+    );
     [
       "royal-swordswoman",
       "royal-spearman",
