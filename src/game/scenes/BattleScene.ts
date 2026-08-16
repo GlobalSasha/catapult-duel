@@ -1236,15 +1236,18 @@ export class BattleScene extends Phaser.Scene {
 
   private createKnightSquadViews(): void {
     const battleState = this.battleController.getState();
+    const terrain = getArenaDefinition(this.arenaId).terrain;
 
     this.knightSquadViews = {
       left: new KnightSquadView(
         this,
         battleState.knightSquads.left,
+        terrain,
       ),
       right: new KnightSquadView(
         this,
         battleState.knightSquads.right,
+        terrain,
       ),
     };
   }
