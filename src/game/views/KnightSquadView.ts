@@ -13,6 +13,7 @@ export const KNIGHT_MARCH_DURATION_MS = 2_800;
 const WALK_FRAMES = {
   "royal-swordswoman-walk-v3": [1, 2, 3, 4, 5, 6, 7, 8],
   "royal-spearman-walk-v2": [1, 2, 3, 4, 5, 6, 7, 8],
+  "royal-ranger-manual-lower-walk-v1": [1, 2, 3, 4, 5, 6, 7, 8],
   "royal-swordswoman": [0, 1, 2, 3, 4, 5, 6, 7],
   "royal-spearman": [0, 1, 2, 3, 4, 5, 6, 7],
   "royal-ranger": [0, 1, 2, 3, 4, 5, 6, 7],
@@ -46,6 +47,12 @@ const UNIT_METADATA: Record<
     originY: 0.90625,
     scale: 0.5,
     stride: 132,
+  },
+  "royal-ranger-manual-lower-walk-v1": {
+    idleFrame: 0,
+    originY: 232 / 256,
+    scale: 0.5,
+    stride: 40,
   },
   "royal-swordswoman": {
     idleFrame: 0,
@@ -95,7 +102,8 @@ function getUnitVisualMetadata(unitKey: UnitKey): UnitVisualMetadata {
 function isAuthoredWalkSheet(unitKey: UnitKey): boolean {
   return (
     unitKey === "royal-swordswoman-walk-v3" ||
-    unitKey === "royal-spearman-walk-v2"
+    unitKey === "royal-spearman-walk-v2" ||
+    unitKey === "royal-ranger-manual-lower-walk-v1"
   );
 }
 
@@ -104,7 +112,7 @@ export class KnightSquadView {
     left: [
       "royal-swordswoman-walk-v3",
       "royal-spearman-walk-v2",
-      "royal-ranger",
+      "royal-ranger-manual-lower-walk-v1",
     ],
     right: ["raider-axeman", "raider-captain", "raider-scout"],
   } as const;
@@ -234,7 +242,7 @@ export class KnightSquadView {
     const surfacePathLength = this.getSurfacePathLength(fromX, toX);
     const cycles = this.unitVisuals.map((visual) =>
       Math.min(
-        5,
+        12,
         Math.max(3, Math.round(surfacePathLength / visual.stride)),
       ),
     );

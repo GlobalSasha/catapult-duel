@@ -66,6 +66,14 @@ export class BootScene extends Phaser.Scene {
         frameHeight: 256,
       },
     );
+    this.load.spritesheet(
+      "royal-ranger-manual-lower-walk-v1",
+      "assets/units/royal-ranger-manual-lower-walk-v1.png",
+      {
+        frameWidth: 256,
+        frameHeight: 256,
+      },
+    );
     [
       "royal-swordswoman",
       "royal-spearman",
